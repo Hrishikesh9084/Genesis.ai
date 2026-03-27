@@ -18,8 +18,7 @@ CREATE TABLE IF NOT EXISTS projects (
   name VARCHAR(255) NOT NULL,
   prompt TEXT NOT NULL,
   stack VARCHAR(100) DEFAULT 'react-express',
-  ALTER TABLE projects
-  ADD COLUMN IF NOT EXISTS model VARCHAR(100) DEFAULT 'gemini-2.0-flash',
+  model VARCHAR(100) DEFAULT 'gemini-2.0-flash',
   status VARCHAR(50) DEFAULT 'generating',
   files JSONB DEFAULT '{}',
   github_repo_url TEXT,
@@ -28,6 +27,9 @@ CREATE TABLE IF NOT EXISTS projects (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE IF EXISTS projects
+ADD COLUMN IF NOT EXISTS model VARCHAR(100) DEFAULT 'gemini-2.0-flash';
 
 CREATE TABLE IF NOT EXISTS deployments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -41,5 +43,5 @@ CREATE TABLE IF NOT EXISTS deployments (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_projects_user_id ON projects(user_id);
-CREATE INDEX idx_deployments_project_id ON deployments(project_id);
+CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
+CREATE INDEX IF NOT EXISTS idx_deployments_project_id ON deployments(project_id);

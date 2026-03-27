@@ -17,8 +17,21 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
+const schemaReady = pool
+  .query(
+    `ALTER TABLE IF EXISTS projects
+     ADD COLUMN IF NOT EXISTS model VARCHAR(100) DEFAULT 'gemini-2.0-flash'`
+  )
+  .catch((err) => {
+    console.error('Schema migration failed:', err.message);
+    throw err;
+  });
+
 const db = {
-  query: (text, params) => pool.query(text, params),
+  query: async (text, params) => {
+    await schemaReady;
+    return pool.query(text, params);
+  },
   pool,
 };
 
