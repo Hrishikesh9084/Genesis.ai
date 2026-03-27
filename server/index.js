@@ -22,7 +22,7 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'https://genesis-ai-azure.vercel.app',
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
 }));
 app.use(express.json({ limit: '50mb' }));
 

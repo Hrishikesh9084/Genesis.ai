@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Github, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { GITHUB_OAUTH_URL } from '../services/api';
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -89,7 +90,7 @@ export default function Register() {
         </div>
 
         <a
-          href="/api/auth/github"
+          href={GITHUB_OAUTH_URL}
           className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-700/60 bg-gray-800/50 text-white hover:bg-gray-700/50 transition-all"
         >
           <Github className="w-5 h-5" />

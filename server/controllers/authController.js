@@ -32,12 +32,23 @@ function httpsGet(url, headers) {
       (res) => {
         let data = '';
         res.on('data', (chunk) => (data += chunk));
-        res.on('end', () => resolve(JSON.parse(data)));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            resolve({});
+          }
+        });
       }
     );
     req.on('error', reject);
     req.end();
   });
+}
+
+function redirectWithOAuthLog(res, label, url) {
+  console.log(`[GitHub OAuth] ${label}: ${url}`);
+  return res.redirect(url);
 }
 
 const register = async (req, res, next) => {
@@ -138,7 +149,7 @@ const githubRedirect = (req, res) => {
   const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/callback/github`;
   const scope = 'user:email repo';
   const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
-  res.redirect(url);
+  return redirectWithOAuthLog(res, 'redirect_to_github_authorize', url);
 };
 
 // GitHub OAuth: handle callback, exchange code for token, find/create user
@@ -146,7 +157,8 @@ const githubCallback = async (req, res, next) => {
   try {
     const { code } = req.query;
     if (!code) {
-      return res.redirect(`${process.env.CLIENT_URL}/login?error=github_no_code`);
+      const redirectUrl = `${process.env.CLIENT_URL}/login?error=github_no_code`;
+      return redirectWithOAuthLog(res, 'missing_code_redirect', redirectUrl);
     }
 
     // Exchange code for access token
@@ -166,7 +178,8 @@ const githubCallback = async (req, res, next) => {
 
     const tokenData = JSON.parse(tokenResponse);
     if (tokenData.error || !tokenData.access_token) {
-      return res.redirect(`${process.env.CLIENT_URL}/login?error=github_token_failed`);
+      const redirectUrl = `${process.env.CLIENT_URL}/login?error=github_token_failed`;
+      return redirectWithOAuthLog(res, 'token_exchange_failed_redirect', redirectUrl);
     }
 
     const accessToken = tokenData.access_token;
@@ -180,16 +193,18 @@ const githubCallback = async (req, res, next) => {
     // Fetch primary email if not public
     let email = ghUser.email;
     if (!email) {
-      const emails = await httpsGet('https://api.github.com/user/emails', {
+      const emailsResponse = await httpsGet('https://api.github.com/user/emails', {
         Authorization: `Bearer ${accessToken}`,
         'User-Agent': 'Genesis.ai',
       });
+      const emails = Array.isArray(emailsResponse) ? emailsResponse : [];
       const primary = emails.find((e) => e.primary && e.verified);
       email = primary ? primary.email : emails[0]?.email;
     }
 
     if (!email) {
-      return res.redirect(`${process.env.CLIENT_URL}/login?error=github_no_email`);
+      const redirectUrl = `${process.env.CLIENT_URL}/login?error=github_no_email`;
+      return redirectWithOAuthLog(res, 'missing_email_redirect', redirectUrl);
     }
 
     const name = ghUser.name || ghUser.login;
@@ -222,10 +237,12 @@ const githubCallback = async (req, res, next) => {
     const token = generateToken(user);
 
     // Redirect to client with JWT token
-    res.redirect(`${process.env.CLIENT_URL}/auth/github/callback?token=${token}`);
+    const redirectUrl = `${process.env.CLIENT_URL}/auth/github/callback?token=${token}`;
+    return redirectWithOAuthLog(res, 'oauth_success_redirect', redirectUrl);
   } catch (err) {
     console.error('GitHub OAuth error:', err);
-    res.redirect(`${process.env.CLIENT_URL}/login?error=github_failed`);
+    const redirectUrl = `${process.env.CLIENT_URL}/login?error=github_failed`;
+    return redirectWithOAuthLog(res, 'oauth_error_redirect', redirectUrl);
   }
 };
 
