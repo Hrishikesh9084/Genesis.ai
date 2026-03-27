@@ -1,15 +1,16 @@
-import express from ('express');
-import cors from ('cors');
-import helmet from ('helmet');
-import rateLimit from ('express-rate-limit');
-import path from ('path');
-require('dotenv').config({ path: path.join(__dirname, '../.env') });
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
+import dotenv from 'dotenv';
+dotenv.config({ path: path.join(__dirname, '../.env') });
 
-import authRoutes from ('./routes/auth');
-import projectRoutes from ('./routes/projects');
-import deployRoutes from ('./routes/deploy');
-import previewRoutes from ('./routes/preview');
-import errorHandler from ('./middleware/errorHandler');
+import authRoutes from './routes/auth';
+import projectRoutes from './routes/projects';
+import deployRoutes from './routes/deploy';
+import previewRoutes from './routes/preview';
+import errorHandler from './middleware/errorHandler';
 
 const app = express();
 const PORT = process.env.PORT || 5000;

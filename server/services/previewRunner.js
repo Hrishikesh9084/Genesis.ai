@@ -1,7 +1,7 @@
-import { spawn } from ('child_process');
-import fs from ('fs');
-import path from ('path');
-import net from ('net');
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import net from 'net';
 
 const PREVIEWS_DIR = path.join(__dirname, '../../previews');
 const activePreviews = new Map();

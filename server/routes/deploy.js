@@ -1,7 +1,7 @@
-import express from ('express');
+import express from 'express';
 import router from express.Router();
-import deployController from  require('../controllers/deployController');
-import authenticate from ('../middleware/auth');
+import deployController from '../controllers/deployController';
+import authenticate from '../middleware/auth';
 
 router.use(authenticate);
 

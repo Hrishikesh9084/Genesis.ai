@@ -1,4 +1,4 @@
-import https from ('https');
+import https from 'https';
 
 function httpsRequest(options, body) {
   return new Promise((resolve, reject) => {
