@@ -6,11 +6,11 @@ import path from 'path';
 import dotenv from 'dotenv';
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
-import authRoutes from './routes/auth';
-import projectRoutes from './routes/projects';
-import deployRoutes from './routes/deploy';
-import previewRoutes from './routes/preview';
-import errorHandler from './middleware/errorHandler';
+import authRoutes from './routes/auth.js';
+import projectRoutes from './routes/projects.js';
+import deployRoutes from './routes/deploy.js';
+import previewRoutes from './routes/preview.js';
+import errorHandler from './middleware/errorHandler.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;

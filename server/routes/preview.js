@@ -1,7 +1,7 @@
 import express from 'express';
 import router from express.Router();
-import previewController from '../controllers/previewController';
-import authenticate from '../middleware/auth';
+import previewController from '../controllers/previewController.js';
+import authenticate from '../middleware/auth.js';
 
 router.use(authenticate);
 

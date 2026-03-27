@@ -1,7 +1,7 @@
 import express from 'express';
 import router from express.Router();
-import deployController from '../controllers/deployController';
-import authenticate from '../middleware/auth';
+import deployController from '../controllers/deployController.js';
+import authenticate from '../middleware/auth.js';
 
 router.use(authenticate);
 

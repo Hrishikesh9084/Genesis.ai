@@ -1,7 +1,7 @@
 import express from 'express';
 import router from express.Router();
-import projectController from '../controllers/projectController';
-import authenticate from '../middleware/auth';
+import projectController from '../controllers/projectController.js';
+import authenticate from '../middleware/auth.js';
 
 router.get('/models', authenticate, projectController.getModels);
 
