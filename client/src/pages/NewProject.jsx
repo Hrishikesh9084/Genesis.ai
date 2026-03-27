@@ -16,7 +16,7 @@ const promptExamples = [
 export default function NewProject() {
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [stack, setStack] = useState("react-express");
+  const [stack, setStack] = useState("nextjs-express");
   const [model, setModel] = useState("");
   const [providers, setProviders] = useState({});
   const [loading, setLoading] = useState(false);
@@ -104,7 +104,7 @@ export default function NewProject() {
               onChange={(e) => setStack(e.target.value)}
               className="input-field"
             >
-              <option value="react-express">React + Express.js</option>
+              <option value="nextjs-express">Nextjs + Express.js</option>
               <option value="react-node">React + Node.js</option>
               <option value="fullstack">
                 Full PERN Stack (PostgreSQL + Express + React + Node)
