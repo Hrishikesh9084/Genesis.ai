@@ -2,7 +2,6 @@ import SectionTitle from "../components/section-title";
 import { CheckIcon, CrownIcon, RocketIcon, ZapIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRef } from "react";
-import { Link } from "react-router-dom";
 
 export default function PricingPlans() {
     const ref = useRef([]);
@@ -56,7 +55,7 @@ export default function PricingPlans() {
     ];
 
     return (
-        <section className="mt-32 md:mt-14">
+        <section className="mt-32">
             <SectionTitle
                 title="Our Pricing Plans"
                 description="A visual collection of our most recent works - each piece crafted with intention, emotion and style."
@@ -85,9 +84,9 @@ export default function PricingPlans() {
                             {item.price} <span className='text-sm font-normal'>/month</span>
                         </h3>
                         <p className='text-gray-200 mt-3'>{item.description}</p>
-                        <Link to="/register" className={`mt-7 rounded-md w-full btn text-center ${item.mostPopular ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white border-0 shadow-lg shadow-orange-500/20' : 'glass'}`}>
+                        <button className={`mt-7 rounded-md w-full btn ${item.mostPopular ? 'bg-orange-500 text-white' : 'glass'}`}>
                             {item.buttonText}
-                        </Link>
+                        </button>
                         <div className='mt-6 flex flex-col'>
                             {item.features.map((feature, index) => (
                                 <div key={index} className='flex items-center gap-2 py-2'>
