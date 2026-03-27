@@ -1,7 +1,7 @@
-const express = require('express');
-const router = express.Router();
-const previewController = require('../controllers/previewController');
-const authenticate = require('../middleware/auth');
+import express from ('express');
+import router from express.Router();
+import previewController from ('../controllers/previewController');
+import authenticate from ('../middleware/auth');
 
 router.use(authenticate);
 

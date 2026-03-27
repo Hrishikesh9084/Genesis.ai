@@ -1,15 +1,15 @@
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
+import express from ('express');
+import cors from ('cors');
+import helmet from ('helmet');
+import rateLimit from ('express-rate-limit');
+import path from ('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-const authRoutes = require('./routes/auth');
-const projectRoutes = require('./routes/projects');
-const deployRoutes = require('./routes/deploy');
-const previewRoutes = require('./routes/preview');
-const errorHandler = require('./middleware/errorHandler');
+import authRoutes from ('./routes/auth');
+import projectRoutes from ('./routes/projects');
+import deployRoutes from ('./routes/deploy');
+import previewRoutes from ('./routes/preview');
+import errorHandler from ('./middleware/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 5000;

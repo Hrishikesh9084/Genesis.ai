@@ -1,7 +1,7 @@
-const express = require('express');
-const router = express.Router();
-const projectController = require('../controllers/projectController');
-const authenticate = require('../middleware/auth');
+import express from('express');
+import router from express.Router();
+import projectController from('../controllers/projectController');
+import authenticate from ('../middleware/auth');
 
 router.get('/models', authenticate, projectController.getModels);
 

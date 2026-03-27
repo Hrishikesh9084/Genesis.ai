@@ -1,6 +1,6 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const OpenAI = require('openai');
-const Anthropic = require('@anthropic-ai/sdk');
+import { GoogleGenerativeAI } from ('@google/generative-ai');
+import OpenAI  from ('openai');
+import Anthropic from ('@anthropic-ai/sdk');
 
 // Provider clients (initialized lazily based on available keys)
 let geminiClient = null;
