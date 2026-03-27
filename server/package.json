@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "db:init": "node config/initDb.js"
-    
+    "db:init": "node config/initDb.js",
+    "build": "echo 'No build step required for server'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

@@ -1,6 +1,14 @@
-import { Octokit } from 'octokit';
+let OctokitClass = null;
+
+async function getOctokitClass() {
+  if (OctokitClass) return OctokitClass;
+  const mod = await import('octokit');
+  OctokitClass = mod.Octokit;
+  return OctokitClass;
+}
 
 const createAndPushRepo = async (githubToken, repoName, files, isPrivate = false) => {
+  const Octokit = await getOctokitClass();
   const octokit = new Octokit({ auth: githubToken });
 
   const sanitizedName = repoName

@@ -42,10 +42,9 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/deploy', deployRoutes);
 app.use('/api/preview', previewRoutes);
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/', (req, res) => {
+  res.json({ message: 'Welcome to the Genesis.ai API' });
 });
-
 app.use(errorHandler);
 
 if (process.env.NODE_ENV === 'production') {
@@ -57,6 +56,8 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../client/dist/index.html'));
   });
 }
+
+
 
 app.listen(PORT, () => {
   console.log(`Genesis.ai server running on port ${PORT}`);
