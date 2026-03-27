@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS projects (
   name VARCHAR(255) NOT NULL,
   prompt TEXT NOT NULL,
   stack VARCHAR(100) DEFAULT 'react-express',
-  model VARCHAR(100) DEFAULT 'gemini-2.0-flash',
+  ALTER TABLE projects
+  ADD COLUMN IF NOT EXISTS model VARCHAR(100) DEFAULT 'gemini-2.0-flash',
   status VARCHAR(50) DEFAULT 'generating',
   files JSONB DEFAULT '{}',
   github_repo_url TEXT,
