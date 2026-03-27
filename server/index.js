@@ -1,11 +1,10 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
-dotenv.config();
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import deployRoutes from './routes/deploy.js';
@@ -37,15 +36,14 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Genesis.ai API is running' });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/deploy', deployRoutes);
 app.use('/api/preview', previewRoutes);
-
-app.get('/', (req, res) => {
-  res.json({ message: 'Welcome to the Genesis.ai API' });
-});
-app.use(errorHandler);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -57,7 +55,7 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Genesis.ai server running on port ${PORT}`);
