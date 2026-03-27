@@ -6,7 +6,17 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PREVIEWS_DIR = path.join(__dirname, '../../previews');
+
+function resolvePreviewsDir() {
+  if (process.env.PREVIEWS_DIR) return process.env.PREVIEWS_DIR;
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join('/tmp', 'previews');
+  }
+  return path.join(__dirname, '../../previews');
+}
+
+const PREVIEWS_DIR = resolvePreviewsDir();
+fs.mkdirSync(PREVIEWS_DIR, { recursive: true });
 const activePreviews = new Map();
 
 function getFreePort() {
@@ -88,6 +98,7 @@ const startPreview = async (projectId, files) => {
     if (fs.existsSync(projectDir)) {
       fs.rmSync(projectDir, { recursive: true, force: true });
     }
+    fs.mkdirSync(projectDir, { recursive: true });
     writeFiles(projectDir, files);
     updateStatus(projectId, 'installing', 'Installing dependencies...');
 
