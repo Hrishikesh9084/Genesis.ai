@@ -36,7 +36,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-app.get('/api/health', (req, res) => {
+app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Genesis.ai API is running' });
 });
 
