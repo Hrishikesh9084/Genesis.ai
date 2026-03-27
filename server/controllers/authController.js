@@ -51,6 +51,16 @@ function redirectWithOAuthLog(res, label, url) {
   return res.redirect(url);
 }
 
+function resolveGithubRedirectUri(req) {
+  const envRedirectUri = process.env.GITHUB_REDIRECT_URI?.trim();
+  if (envRedirectUri) return envRedirectUri;
+
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  return `${protocol}://${host}/api/auth/callback/github`;
+}
+
 const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
@@ -146,7 +156,7 @@ const updateGithubToken = async (req, res, next) => {
 // GitHub OAuth: redirect user to GitHub authorization page
 const githubRedirect = (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
-  const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/callback/github`;
+  const redirectUri = resolveGithubRedirectUri(req);
   const scope = 'user:email repo';
   const url = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
   return redirectWithOAuthLog(res, 'redirect_to_github_authorize', url);
