@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import https from 'https';
-import db from '../config/db';
+import db from '../config/db.js';
 
 function generateToken(user) {
   return jwt.sign(
@@ -40,7 +40,7 @@ function httpsGet(url, headers) {
   });
 }
 
-exports.register = async (req, res, next) => {
+const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body;
 
@@ -74,7 +74,7 @@ exports.register = async (req, res, next) => {
   }
 };
 
-exports.login = async (req, res, next) => {
+const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
@@ -102,7 +102,7 @@ exports.login = async (req, res, next) => {
   }
 };
 
-exports.getMe = async (req, res, next) => {
+const getMe = async (req, res, next) => {
   try {
     const result = await db.query(
       'SELECT id, name, email, avatar_url, created_at FROM users WHERE id = $1',
@@ -119,7 +119,7 @@ exports.getMe = async (req, res, next) => {
   }
 };
 
-exports.updateGithubToken = async (req, res, next) => {
+const updateGithubToken = async (req, res, next) => {
   try {
     const { github_token } = req.body;
     await db.query('UPDATE users SET github_token = $1, updated_at = NOW() WHERE id = $2', [
@@ -133,7 +133,7 @@ exports.updateGithubToken = async (req, res, next) => {
 };
 
 // GitHub OAuth: redirect user to GitHub authorization page
-exports.githubRedirect = (req, res) => {
+const githubRedirect = (req, res) => {
   const clientId = process.env.GITHUB_CLIENT_ID;
   const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/callback/github`;
   const scope = 'user:email repo';
@@ -142,7 +142,7 @@ exports.githubRedirect = (req, res) => {
 };
 
 // GitHub OAuth: handle callback, exchange code for token, find/create user
-exports.githubCallback = async (req, res, next) => {
+const githubCallback = async (req, res, next) => {
   try {
     const { code } = req.query;
     if (!code) {
@@ -227,4 +227,13 @@ exports.githubCallback = async (req, res, next) => {
     console.error('GitHub OAuth error:', err);
     res.redirect(`${process.env.CLIENT_URL}/login?error=github_failed`);
   }
+};
+
+export default {
+  register,
+  login,
+  getMe,
+  updateGithubToken,
+  githubRedirect,
+  githubCallback,
 };

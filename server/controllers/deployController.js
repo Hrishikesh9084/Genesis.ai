@@ -1,7 +1,7 @@
-import db from '../config/db';
-import deployService from '../services/deployService';
+import db from '../config/db.js';
+import deployService from '../services/deployService.js';
 
-exports.deployProject = async (req, res, next) => {
+const deployProject = async (req, res, next) => {
   try {
     const { platform } = req.body;
     const { id } = req.params;
@@ -68,7 +68,7 @@ async function deployAsync(deploymentId, project, platform) {
   }
 }
 
-exports.getDeployments = async (req, res, next) => {
+const getDeployments = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -92,7 +92,7 @@ exports.getDeployments = async (req, res, next) => {
   }
 };
 
-exports.getDeploymentStatus = async (req, res, next) => {
+const getDeploymentStatus = async (req, res, next) => {
   try {
     const result = await db.query('SELECT * FROM deployments WHERE id = $1', [req.params.deployId]);
 
@@ -104,4 +104,10 @@ exports.getDeploymentStatus = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+export default {
+  deployProject,
+  getDeployments,
+  getDeploymentStatus,
 };

@@ -1,7 +1,8 @@
-import  express from 'express';
-import  router from express.Router();
-import  authController from '../controllers/authController.js';
-import  authenticate from '../middleware/auth.js';
+import express from 'express';
+import authController from '../controllers/authController.js';
+import authenticate from '../middleware/auth.js';
+
+const router = express.Router();
 
 router.post('/register', authController.register);
 router.post('/login', authController.login);
@@ -12,4 +13,4 @@ router.put('/github-token', authenticate, authController.updateGithubToken);
 router.get('/github', authController.githubRedirect);
 router.get('/callback/github', authController.githubCallback);
 
-module.exports = router;
+export default router;

@@ -1,7 +1,7 @@
-import db from  '../config/db';
-import previewRunner from '../services/previewRunner';
+import db from '../config/db.js';
+import previewRunner from '../services/previewRunner.js';
 
-exports.startPreview = async (req, res, next) => {
+const startPreview = async (req, res, next) => {
   try {
     const { id } = req.params;
 
@@ -32,7 +32,7 @@ exports.startPreview = async (req, res, next) => {
   }
 };
 
-exports.stopPreview = async (req, res, next) => {
+const stopPreview = async (req, res, next) => {
   try {
     await previewRunner.stopPreview(req.params.id);
     res.json({ status: 'stopped' });
@@ -41,7 +41,13 @@ exports.stopPreview = async (req, res, next) => {
   }
 };
 
-exports.getPreviewStatus = (req, res) => {
+const getPreviewStatus = (req, res) => {
   const status = previewRunner.getStatus(req.params.id);
   res.json(status);
+};
+
+export default {
+  startPreview,
+  stopPreview,
+  getPreviewStatus,
 };

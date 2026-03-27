@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 dotenv.config();
 import authRoutes from './routes/auth.js';
@@ -10,6 +11,9 @@ import projectRoutes from './routes/projects.js';
 import deployRoutes from './routes/deploy.js';
 import previewRoutes from './routes/preview.js';
 import errorHandler from './middleware/errorHandler.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -58,4 +62,4 @@ app.listen(PORT, () => {
   console.log(`Genesis.ai server running on port ${PORT}`);
 });
 
-module.exports = app;
+export default app;

@@ -1,15 +1,15 @@
-import db from '../config/db';
-import aiGenerator from '../services/aiGenerator';
-import githubService from '../services/githubService';
+import db from '../config/db.js';
+import aiGenerator from '../services/aiGenerator.js';
+import githubService from '../services/githubService.js';
 
-exports.getModels = (req, res) => {
+const getModels = (req, res) => {
   res.json({
     providers: aiGenerator.getAvailableModels(),
     default: aiGenerator.DEFAULT_MODEL,
   });
 };
 
-exports.getProjects = async (req, res, next) => {
+const getProjects = async (req, res, next) => {
   try {
     const result = await db.query(
       'SELECT id, name, prompt, stack, status, github_repo_url, deploy_url, deploy_platform, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY created_at DESC',
@@ -21,7 +21,7 @@ exports.getProjects = async (req, res, next) => {
   }
 };
 
-exports.getProject = async (req, res, next) => {
+const getProject = async (req, res, next) => {
   try {
     const result = await db.query('SELECT * FROM projects WHERE id = $1 AND user_id = $2', [
       req.params.id,
@@ -38,7 +38,7 @@ exports.getProject = async (req, res, next) => {
   }
 };
 
-exports.createProject = async (req, res, next) => {
+const createProject = async (req, res, next) => {
   try {
     const { name, prompt, stack, model } = req.body;
 
@@ -81,7 +81,7 @@ async function generateProjectAsync(projectId, prompt, stack, modelName) {
   }
 }
 
-exports.editProject = async (req, res, next) => {
+const editProject = async (req, res, next) => {
   try {
     const { prompt: editPrompt, model } = req.body;
     const { id } = req.params;
@@ -129,7 +129,7 @@ async function editProjectAsync(projectId, currentFiles, originalPrompt, editPro
   }
 }
 
-exports.updateProjectFiles = async (req, res, next) => {
+const updateProjectFiles = async (req, res, next) => {
   try {
     const { files } = req.body;
     const { id } = req.params;
@@ -149,7 +149,7 @@ exports.updateProjectFiles = async (req, res, next) => {
   }
 };
 
-exports.deleteProject = async (req, res, next) => {
+const deleteProject = async (req, res, next) => {
   try {
     const result = await db.query('DELETE FROM projects WHERE id = $1 AND user_id = $2 RETURNING id', [
       req.params.id,
@@ -166,7 +166,7 @@ exports.deleteProject = async (req, res, next) => {
   }
 };
 
-exports.pushToGithub = async (req, res, next) => {
+const pushToGithub = async (req, res, next) => {
   try {
     const { repoName, isPrivate } = req.body;
     const { id } = req.params;
@@ -204,4 +204,15 @@ exports.pushToGithub = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+export default {
+  getModels,
+  getProjects,
+  getProject,
+  createProject,
+  editProject,
+  updateProjectFiles,
+  deleteProject,
+  pushToGithub,
 };

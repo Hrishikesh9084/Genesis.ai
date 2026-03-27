@@ -19,7 +19,7 @@ function httpsRequest(options, body) {
   });
 }
 
-exports.deployToVercel = async (project) => {
+const deployToVercel = async (project) => {
   const token = process.env.VERCEL_TOKEN;
   if (!token) throw new Error('Vercel token not configured.');
 
@@ -70,7 +70,7 @@ exports.deployToVercel = async (project) => {
   };
 };
 
-exports.deployToRender = async (project) => {
+const deployToRender = async (project) => {
   const apiKey = process.env.RENDER_API_KEY;
   if (!apiKey) throw new Error('Render API key not configured.');
 
@@ -122,4 +122,9 @@ exports.deployToRender = async (project) => {
     url: `https://${service.slug || projectName}.onrender.com`,
     deployId: service.id,
   };
+};
+
+export default {
+  deployToVercel,
+  deployToRender,
 };

@@ -2,7 +2,10 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import net from 'net';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const PREVIEWS_DIR = path.join(__dirname, '../../previews');
 const activePreviews = new Map();
 
@@ -69,12 +72,12 @@ function updateStatus(projectId, status, step, extra = {}) {
   activePreviews.set(projectId, { ...prev, status, step, ...extra });
 }
 
-exports.startPreview = async (projectId, files) => {
+const startPreview = async (projectId, files) => {
   if (activePreviews.has(projectId)) {
     const existing = activePreviews.get(projectId);
     if (existing.status === 'running') return existing;
     if (existing.status === 'starting' || existing.status === 'installing') return existing;
-    await exports.stopPreview(projectId);
+    await stopPreview(projectId);
   }
 
   const projectDir = path.join(PREVIEWS_DIR, projectId);
@@ -197,7 +200,7 @@ export default defineConfig({
   }
 };
 
-exports.stopPreview = async (projectId) => {
+const stopPreview = async (projectId) => {
   const preview = activePreviews.get(projectId);
   if (!preview) return;
   killProc(preview.backendProc);
@@ -205,7 +208,7 @@ exports.stopPreview = async (projectId) => {
   activePreviews.delete(projectId);
 };
 
-exports.getStatus = (projectId) => {
+const getStatus = (projectId) => {
   const preview = activePreviews.get(projectId);
   if (!preview) return { status: 'stopped', step: '' };
   return {
@@ -219,9 +222,15 @@ exports.getStatus = (projectId) => {
 // Clean up all previews on process exit
 function cleanupAll() {
   for (const [id] of activePreviews) {
-    exports.stopPreview(id);
+    stopPreview(id);
   }
 }
 process.on('exit', cleanupAll);
 process.on('SIGINT', () => { cleanupAll(); process.exit(); });
 process.on('SIGTERM', () => { cleanupAll(); process.exit(); });
+
+export default {
+  startPreview,
+  stopPreview,
+  getStatus,
+};

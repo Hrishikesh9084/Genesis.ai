@@ -211,10 +211,7 @@ async function callModel(modelId, systemPrompt, userPrompt) {
 
 // ---- Exports ----
 
-exports.DEFAULT_MODEL = DEFAULT_MODEL;
-exports.getAvailableModels = getAvailableModels;
-
-exports.generateProject = async (prompt, stack, modelName) => {
+const generateProject = async (prompt, stack, modelName) => {
   try {
     const modelId = resolveModel(modelName);
 
@@ -236,7 +233,7 @@ Return the result as a JSON object where each key is a file path and each value 
   }
 };
 
-exports.editProject = async (currentFiles, originalPrompt, editPrompt, stack, modelName) => {
+const editProject = async (currentFiles, originalPrompt, editPrompt, stack, modelName) => {
   try {
     const modelId = resolveModel(modelName);
     const filesSummary = Object.keys(currentFiles).join('\n');
@@ -261,3 +258,13 @@ Apply the requested changes to the project. Return the COMPLETE updated project 
     throw new Error('Failed to edit project: ' + err.message);
   }
 };
+
+const aiGenerator = {
+  DEFAULT_MODEL,
+  getAvailableModels,
+  generateProject,
+  editProject,
+};
+
+export { DEFAULT_MODEL, getAvailableModels, generateProject, editProject };
+export default aiGenerator;

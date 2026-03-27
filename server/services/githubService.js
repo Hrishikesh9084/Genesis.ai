@@ -1,6 +1,6 @@
 import { Octokit } from 'octokit';
 
-exports.createAndPushRepo = async (githubToken, repoName, files, isPrivate = false) => {
+const createAndPushRepo = async (githubToken, repoName, files, isPrivate = false) => {
   const octokit = new Octokit({ auth: githubToken });
 
   const sanitizedName = repoName
@@ -75,4 +75,8 @@ exports.createAndPushRepo = async (githubToken, repoName, files, isPrivate = fal
   });
 
   return repo.html_url;
+};
+
+export default {
+  createAndPushRepo,
 };
