@@ -35,6 +35,11 @@ export default function NewProject() {
             label: "Google",
             models: [
               {
+                id: "gemini-2.5-flash",
+                name: "Gemini 2.5 Flash",
+                desc: "Balanced speed and quality",
+              },
+              {
                 id: "gemini-2.0-flash",
                 name: "Gemini 2.0 Flash",
                 desc: "Fast & efficient",
@@ -42,7 +47,7 @@ export default function NewProject() {
             ],
           },
         });
-        setModel("gemini-2.0-flash");
+        setModel("gemini-2.5-flash");
       });
   }, []);
 

@@ -35,7 +35,7 @@ const MODEL_CATALOG = {
     models: [
       { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Fast & efficient', envKey: 'GEMINI_API_KEY' },
       { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', desc: 'Lightweight & quick', envKey: 'GEMINI_API_KEY' },
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Balanced speed & quality', envKey: 'GEMINI_API_KEY' },
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Balanced speed and quality', envKey: 'GEMINI_API_KEY' },
       { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', desc: 'Best Gemini quality', envKey: 'GEMINI_API_KEY' },
     ],
   },
@@ -60,7 +60,7 @@ const MODEL_CATALOG = {
   },
 };
 
-const DEFAULT_MODEL = 'gemini-2.0-flash';
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 function getModelInfo(modelId) {
   for (const provider of Object.values(MODEL_CATALOG)) {

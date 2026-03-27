@@ -33,7 +33,15 @@ export default function EditProject() {
         setProviders(res.data.providers);
       })
       .catch(() => {
-        setProviders({ google: { label: 'Google', models: [{ id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Fast & efficient' }] } });
+        setProviders({
+          google: {
+            label: 'Google',
+            models: [
+              { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Balanced speed and quality' },
+              { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Fast & efficient' },
+            ],
+          },
+        });
       });
   }, [id]);
 
@@ -41,7 +49,7 @@ export default function EditProject() {
     try {
       const res = await api.get(`/projects/${id}`);
       setProject(res.data.project);
-      setModel(res.data.project.model || 'gemini-2.0-flash');
+      setModel(res.data.project.model || 'gemini-2.5-flash');
     } catch (err) {
       toast.error('Failed to load project');
       navigate('/dashboard');

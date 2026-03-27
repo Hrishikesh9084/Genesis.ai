@@ -1,4 +1,4 @@
-import { PlayCircleIcon } from "lucide-react";
+import { DollarSign, PlayCircleIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 
@@ -34,7 +34,7 @@ export default function HeroSection() {
                     viewport={{ once: true }}
                     transition={{ type: "spring", stiffness: 240, damping: 70, mass: 1 }}
                 >
-                    Build, Deploy & Talk to AI Agents in Seconds.
+                    Build, Deploy and Talk to AI Agents in Seconds.
                 </motion.h1>
                 <motion.p className="text-center text-gray-100 text-base/7 max-w-md mt-6"
                     initial={{ y: 50, opacity: 0 }}
@@ -55,7 +55,7 @@ export default function HeroSection() {
                         Get Started Free
                     </Link>
                     <Link to="/plans" className="btn max-md:w-full glass flex items-center justify-center gap-2 py-3">
-                        <PlayCircleIcon className="size-4.5" />
+                        <DollarSign className="size-4.5" />
                         View Plans
                     </Link>
                 </motion.div>
