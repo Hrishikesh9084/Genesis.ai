@@ -3,9 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
-import dotenv from 'dotenv';
-dotenv.config({ path: path.join(__dirname, '../.env') });
-
+dotenv.config();
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import deployRoutes from './routes/deploy.js';
