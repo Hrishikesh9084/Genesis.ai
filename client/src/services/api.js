@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: process.meta.env.BACKEND_URL || 'http://localhost:5000' ||  'https://genesis-ai-tu97.vercel.app',
+  baseURL: 'https://genesis-ai-tu97.vercel.app',
   headers: { 'Content-Type': 'application/json' },
 });
 
