@@ -1,5 +1,5 @@
-const db = require('../config/db');
-const previewRunner = require('../services/previewRunner');
+import db from  '../config/db';
+import previewRunner from '../services/previewRunner';
 
 exports.startPreview = async (req, res, next) => {
   try {

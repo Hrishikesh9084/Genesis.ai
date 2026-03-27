@@ -1,6 +1,6 @@
-const db = require('../config/db');
-const aiGenerator = require('../services/aiGenerator');
-const githubService = require('../services/githubService');
+import db from '../config/db';
+import aiGenerator from '../services/aiGenerator';
+import githubService from '../services/githubService';
 
 exports.getModels = (req, res) => {
   res.json({

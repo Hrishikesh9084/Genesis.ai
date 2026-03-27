@@ -1,7 +1,7 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const https = require('https');
-const db = require('../config/db');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import https from 'https';
+import db from '../config/db';
 
 function generateToken(user) {
   return jwt.sign(

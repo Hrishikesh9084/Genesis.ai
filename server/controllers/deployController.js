@@ -1,5 +1,5 @@
-const db = require('../config/db');
-const deployService = require('../services/deployService');
+import db from '../config/db';
+import deployService from '../services/deployService';
 
 exports.deployProject = async (req, res, next) => {
   try {
