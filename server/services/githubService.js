@@ -1,4 +1,4 @@
-const { Octokit } = require('octokit');
+import { Octokit } from 'octokit';
 
 exports.createAndPushRepo = async (githubToken, repoName, files, isPrivate = false) => {
   const octokit = new Octokit({ auth: githubToken });
