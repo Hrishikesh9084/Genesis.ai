@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Chrome, Github, Loader2 } from "lucide-react";
+import { Github, Loader2 } from "lucide-react";
+import { FcGoogle } from 'react-icons/fc';
 import toast from "react-hot-toast";
 import { GITHUB_OAUTH_URL, GOOGLE_OAUTH_URL } from '../services/api';
 import { validateRegisterInput } from "../utils/validators";
@@ -100,7 +101,7 @@ export default function Register() {
           href={GOOGLE_OAUTH_URL}
           className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-700/60 bg-white text-gray-900 hover:bg-gray-100 transition-all"
         >
-          <Chrome className="w-5 h-5" />
+          <FcGoogle className="w-5 h-5" />
           <span>Continue with Google</span>
         </a>
 
