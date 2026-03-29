@@ -17,6 +17,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Required when running behind a reverse proxy (Vercel/Render/Nginx) so req.ip is derived correctly.
+app.set('trust proxy', 1);
+
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
@@ -33,9 +36,15 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Genesis.ai API is healthy' });
+});
+
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Genesis.ai API is running' });
 });
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);

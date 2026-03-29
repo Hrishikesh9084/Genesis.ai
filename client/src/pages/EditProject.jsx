@@ -4,6 +4,7 @@ import { Sparkles, ArrowLeft, Loader2, Lightbulb, Cpu } from 'lucide-react';
 import api from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { validateEditPrompt } from '../utils/validators';
 
 const editExamples = [
   'Add a dark mode toggle to the navbar',
@@ -41,6 +42,27 @@ export default function EditProject() {
               { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Fast & efficient' },
             ],
           },
+          anthropic: {
+            label: 'Anthropic',
+            models: [
+              { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', desc: 'Newest Sonnet release' },
+            ],
+          },
+          mistral: {
+            label: 'Mistral',
+            models: [
+              { id: 'mistral-small-latest', name: 'Mistral Small', desc: 'Fast and efficient' },
+              { id: 'mistral-medium-latest', name: 'Mistral Medium', desc: 'Balanced quality' },
+              { id: 'mistral-large-latest', name: 'Mistral Large', desc: 'Most capable Mistral' },
+            ],
+          },
+          xai: {
+            label: 'Grok (xAI)',
+            models: [
+              { id: 'grok-3-mini', name: 'Grok 3 Mini', desc: 'Fast Grok model' },
+              { id: 'grok-3', name: 'Grok 3', desc: 'Most capable Grok model' },
+            ],
+          },
         });
       });
   }, [id]);
@@ -60,8 +82,9 @@ export default function EditProject() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!editPrompt.trim()) {
-      toast.error('Please describe the changes you want');
+    const validationError = validateEditPrompt(editPrompt);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -109,7 +132,7 @@ export default function EditProject() {
             value={editPrompt}
             onChange={(e) => setEditPrompt(e.target.value)}
             placeholder="Describe the changes you want... e.g., 'Add a dark mode toggle' or 'Connect the login form to the backend auth API'"
-            className="input-field min-h-[150px] resize-y"
+            className="input-field min-h-37.5 resize-y"
             required
           />
           <p className="text-xs text-gray-500 mt-1.5">

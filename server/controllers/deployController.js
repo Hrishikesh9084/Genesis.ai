@@ -25,6 +25,10 @@ const deployProject = async (req, res, next) => {
       return res.status(400).json({ error: 'Project is not ready for deployment.' });
     }
 
+    if (!project.github_repo_url) {
+      return res.status(400).json({ error: 'Push code to GitHub before deploying.' });
+    }
+
     const deployResult = await db.query(
       'INSERT INTO deployments (project_id, platform, status) VALUES ($1, $2, $3) RETURNING *',
       [id, platform, 'deploying']

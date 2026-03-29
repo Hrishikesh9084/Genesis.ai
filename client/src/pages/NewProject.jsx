@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sparkles, Loader2, Lightbulb, Cpu } from "lucide-react";
+import { Sparkles, Loader2, Lightbulb, Cpu, ChevronDown, Check } from "lucide-react";
 import api from "../services/api";
 import toast from "react-hot-toast";
+import { validateProjectInput } from "../utils/validators";
 
 const promptExamples = [
   "Build a todo app with user authentication, categories, due dates, and priority levels",
@@ -20,7 +21,30 @@ export default function NewProject() {
   const [model, setModel] = useState("");
   const [providers, setProviders] = useState({});
   const [loading, setLoading] = useState(false);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef(null);
   const navigate = useNavigate();
+
+  const selectedModel = useMemo(() => {
+    for (const provider of Object.values(providers)) {
+      const found = provider.models?.find((m) => m.id === model);
+      if (found) return found;
+    }
+    return null;
+  }, [providers, model]);
+
+  useEffect(() => {
+    if (!isModelDropdownOpen) return undefined;
+
+    const onDocumentClick = (event) => {
+      if (!modelDropdownRef.current?.contains(event.target)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onDocumentClick);
+    return () => document.removeEventListener("mousedown", onDocumentClick);
+  }, [isModelDropdownOpen]);
 
   useEffect(() => {
     api
@@ -46,6 +70,51 @@ export default function NewProject() {
               },
             ],
           },
+          anthropic: {
+            label: "Anthropic",
+            models: [
+              {
+                id: "claude-sonnet-4-6",
+                name: "Claude Sonnet 4.6",
+                desc: "Newest Sonnet release",
+              },
+            ],
+          },
+          mistral: {
+            label: "Mistral",
+            models: [
+              {
+                id: "mistral-small-latest",
+                name: "Mistral Small",
+                desc: "Fast and efficient",
+              },
+              {
+                id: "mistral-medium-latest",
+                name: "Mistral Medium",
+                desc: "Balanced quality",
+              },
+              {
+                id: "mistral-large-latest",
+                name: "Mistral Large",
+                desc: "Most capable Mistral",
+              },
+            ],
+          },
+          xai: {
+            label: "Grok (xAI)",
+            models: [
+              {
+                id: "grok-3-mini",
+                name: "Grok 3 Mini",
+                desc: "Fast Grok model",
+              },
+              {
+                id: "grok-3",
+                name: "Grok 3",
+                desc: "Most capable Grok model",
+              },
+            ],
+          },
         });
         setModel("gemini-2.5-flash");
       });
@@ -53,8 +122,9 @@ export default function NewProject() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !prompt.trim()) {
-      toast.error("Please fill in all fields");
+    const validationError = validateProjectInput({ name, prompt });
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
@@ -105,7 +175,12 @@ export default function NewProject() {
               className="input-field"
             >
               <option value="nextjs-express">Nextjs + Express.js</option>
+              <option value="react-express">React (Vite) + Express.js</option>
               <option value="react-node">React + Node.js</option>
+              <option value="vue-node">Vue + Node.js</option>
+              <option value="nuxt-express">Nuxt + Express.js</option>
+              <option value="sveltekit-node">SvelteKit + Node.js</option>
+              <option value="astro-express">Astro + Express.js</option>
               <option value="fullstack">
                 Full PERN Stack (PostgreSQL + Express + React + Node)
               </option>
@@ -119,23 +194,61 @@ export default function NewProject() {
                 AI Model
               </span>
             </label>
-            <div className="space-y-4">
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="input-field"
+            <div ref={modelDropdownRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsModelDropdownOpen((open) => !open)}
+                className="input-field w-full flex items-center justify-between"
+                aria-haspopup="listbox"
+                aria-expanded={isModelDropdownOpen}
               >
-                {Object.entries(providers).map(([key, provider]) => (
-                  <optgroup key={key} label={provider.label}>
-                    {provider.models.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                        {m.desc ? ` - ${m.desc}` : ""}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+                <span className="text-left truncate">
+                  {selectedModel
+                    ? `${selectedModel.name}${selectedModel.desc ? ` - ${selectedModel.desc}` : ""}`
+                    : "Select an AI model"}
+                </span>
+                <ChevronDown
+                  className={`w-4 h-4 text-gray-400 transition-transform ${
+                    isModelDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {isModelDropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-gray-700 bg-gray-900 shadow-2xl z-30 max-h-72 overflow-y-auto">
+                  {Object.entries(providers).map(([key, provider]) => (
+                    <div key={key} className="p-2">
+                      <p className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        {provider.label}
+                      </p>
+                      {provider.models.map((m) => {
+                        const selected = model === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              setModel(m.id);
+                              setIsModelDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-start justify-between gap-2 text-left px-3 py-2 rounded-lg transition-colors ${
+                              selected ? "bg-orange-500/15 text-orange-300" : "text-gray-200 hover:bg-gray-800"
+                            }`}
+                            role="option"
+                            aria-selected={selected}
+                          >
+                            <span>
+                              <span className="block text-sm font-medium">{m.name}</span>
+                              {m.desc && <span className="block text-xs text-gray-500 mt-0.5">{m.desc}</span>}
+                            </span>
+                            {selected && <Check className="w-4 h-4 mt-0.5 shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -147,7 +260,7 @@ export default function NewProject() {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe the application you want to build. Include features, pages, functionality, and any specific requirements..."
-              className="input-field min-h-[180px] resize-y"
+              className="input-field min-h-45 resize-y"
               required
             />
             <p className="text-xs text-gray-500 mt-1.5">

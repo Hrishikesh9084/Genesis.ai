@@ -8,9 +8,13 @@ CREATE TABLE IF NOT EXISTS users (
   github_id VARCHAR(100) UNIQUE,
   github_token TEXT,
   avatar_url TEXT,
+  email_verified_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE IF EXISTS users
+ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

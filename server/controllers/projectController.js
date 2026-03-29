@@ -50,12 +50,12 @@ const createProject = async (req, res, next) => {
 
     const result = await db.query(
       'INSERT INTO projects (user_id, name, prompt, stack, model, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [req.user.id, name, prompt, stack || 'react-express', selectedModel, 'generating']
+      [req.user.id, name, prompt, stack || 'nextjs-express', selectedModel, 'generating']
     );
 
     const project = result.rows[0];
 
-    generateProjectAsync(project.id, prompt, stack || 'react-express', selectedModel);
+    generateProjectAsync(project.id, prompt, stack || 'nextjs-express', selectedModel);
 
     res.status(201).json({ project });
   } catch (err) {
@@ -123,7 +123,7 @@ async function editProjectAsync(projectId, currentFiles, originalPrompt, editPro
   } catch (err) {
     console.error('Project edit failed:', err);
     await db.query('UPDATE projects SET status = $1, updated_at = NOW() WHERE id = $2', [
-      'ready',
+      'error',
       projectId,
     ]);
   }
@@ -206,6 +206,25 @@ const pushToGithub = async (req, res, next) => {
   }
 };
 
+const cancelProject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+      'UPDATE projects SET status = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3 RETURNING *',
+      ['cancelled', id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found.' });
+    }
+
+    res.json({ message: 'Generation cancelled.', project: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   getModels,
   getProjects,
@@ -215,4 +234,5 @@ export default {
   updateProjectFiles,
   deleteProject,
   pushToGithub,
+  cancelProject,
 };

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useAuth } from "./context/AuthContext";
 import { Navigate, Route, Routes } from "react-router-dom";
 import LenisScroll from "./components/lenis-scroll";
@@ -50,6 +50,34 @@ function GuestRoute({ children }) {
 }
 
 export default function App() {
+  const [showBootLoader, setShowBootLoader] = useState(true);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setShowBootLoader(false);
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  if (showBootLoader) {
+    return (
+      <div className="fixed inset-0 z-100 flex items-center justify-center bg-black">
+        <div className="fixed inset-0 opacity-60">
+          <Background
+            colorStops={["#5227FF", "#000", "#5227FF"]}
+            blend={0.6}
+            amplitude={1.2}
+            speed={0.8}
+          />
+        </div>
+        <div className="relative glass rounded-2xl px-8 py-10 text-center shadow-xl shadow-black/40">
+          <LoadingSpinner text="Starting Genesis.ai..." size="lg" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <LenisScroll />
@@ -90,6 +118,7 @@ export default function App() {
 
             {/* OAuth callback - no guard, handles its own auth */}
             <Route path="/auth/github/callback" element={<GithubCallback />} />
+            <Route path="/auth/google/callback" element={<GithubCallback />} />
 
             {/* 404 */}
             <Route path="*" element={<NotFound />} />

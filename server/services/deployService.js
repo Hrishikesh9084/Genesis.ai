@@ -19,6 +19,37 @@ function httpsRequest(options, body) {
   });
 }
 
+async function resolveRenderOwnerId(apiKey) {
+  if (process.env.RENDER_OWNER_ID) {
+    return process.env.RENDER_OWNER_ID;
+  }
+
+  const ownersResponse = await httpsRequest({
+    hostname: 'api.render.com',
+    path: '/v1/owners',
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (ownersResponse.statusCode >= 400) {
+    throw new Error(`Unable to fetch Render workspaces: ${JSON.stringify(ownersResponse.data)}`);
+  }
+
+  const owners = ownersResponse.data?.owners || ownersResponse.data || [];
+  const ownerId = Array.isArray(owners) ? owners[0]?.owner?.id || owners[0]?.id : owners?.id;
+
+  if (!ownerId) {
+    throw new Error(
+      'Render workspace not found. Set RENDER_OWNER_ID or ensure the API key has access to at least one workspace.'
+    );
+  }
+
+  return ownerId;
+}
+
 const deployToVercel = async (project) => {
   const token = process.env.VERCEL_TOKEN;
   if (!token) throw new Error('Vercel token not configured.');
@@ -84,19 +115,22 @@ const deployToRender = async (project) => {
     .replace(/-+/g, '-')
     .substring(0, 50);
 
+  const ownerId = await resolveRenderOwnerId(apiKey);
+
   const servicePayload = {
     type: 'web_service',
     name: projectName,
+    ownerId,
     repo: project.github_repo_url,
     autoDeploy: 'yes',
-    branch: 'main',
-    buildCommand: 'cd server && npm install',
-    startCommand: 'cd server && npm start',
+    buildCommand: 'npm install',
+    startCommand: 'npm start',
+    rootDir: 'server',
     envVars: [
       { key: 'NODE_ENV', value: 'production' },
     ],
     plan: 'free',
-    runtime: 'node',
+    env: 'node',
   };
 
   const response = await httpsRequest(
@@ -106,6 +140,7 @@ const deployToRender = async (project) => {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
         'Content-Type': 'application/json',
       },
     },

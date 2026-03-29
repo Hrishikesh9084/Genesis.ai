@@ -50,6 +50,22 @@ function runCmd(cmd, args, cwd, env) {
   });
 }
 
+function readPackageJson(dir) {
+  const pkgPath = path.join(dir, 'package.json');
+  if (!fs.existsSync(pkgPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function getScriptCommand(pkg, preferredScripts) {
+  if (!pkg?.scripts) return null;
+  const name = preferredScripts.find((script) => typeof pkg.scripts[script] === 'string');
+  return name || null;
+}
+
 function killProc(proc) {
   if (!proc || proc.killed) return;
   try {
@@ -119,20 +135,20 @@ const startPreview = async (projectId, files) => {
       await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], serverDir);
     }
 
-    // Overwrite vite.config to set correct port and proxy
-    if (hasClient) {
-      const viteConfig = `
-import { defineConfig } from 'vite';
-let reactPlugin;
-try { reactPlugin = (await import('@vitejs/plugin-react')).default; } catch(e) {}
+    // Ensure preview proxy works even when generated client has no vite config.
+    if (hasClient && !fs.existsSync(path.join(clientDir, 'vite.config.js'))) {
+      const viteConfig = `import { defineConfig } from 'vite';
+
 export default defineConfig({
-  plugins: reactPlugin ? [reactPlugin()] : [],
   server: {
+    host: true,
     port: ${frontendPort},
     strictPort: true,
-    host: true,
     proxy: {
-      '/api': { target: 'http://127.0.0.1:${backendPort}', changeOrigin: true },
+      '/api': {
+        target: 'http://127.0.0.1:${backendPort}',
+        changeOrigin: true,
+      },
     },
   },
 });
@@ -144,12 +160,18 @@ export default defineConfig({
 
     // Step 3: Start backend
     let backendProc = null;
+    let backendLogs = '';
     if (hasServer) {
+      const serverPkg = readPackageJson(serverDir);
+      const serverScript = getScriptCommand(serverPkg, ['dev', 'start']);
       const entry = ['index.js', 'server.js', 'app.js'].find(
         (f) => fs.existsSync(path.join(serverDir, f))
       ) || 'index.js';
 
-      backendProc = spawn('node', [entry], {
+      const backendCommand = serverScript ? 'npm' : 'node';
+      const backendArgs = serverScript ? ['run', serverScript] : [entry];
+
+      backendProc = spawn(backendCommand, backendArgs, {
         cwd: serverDir,
         shell: true,
         stdio: 'pipe',
@@ -160,23 +182,61 @@ export default defineConfig({
           DATABASE_URL: process.env.DATABASE_URL || '',
         },
       });
-      backendProc.stdout.on('data', (d) => console.log(`[preview:backend:${projectId}] ${d.toString().trim()}`));
-      backendProc.stderr.on('data', (d) => console.log(`[preview:backend:${projectId}] ${d.toString().trim()}`));
+      backendProc.stdout.on('data', (d) => {
+        const line = d.toString();
+        backendLogs += line;
+        if (backendLogs.length > 6000) backendLogs = backendLogs.slice(-6000);
+        console.log(`[preview:backend:${projectId}] ${line.trim()}`);
+      });
+      backendProc.stderr.on('data', (d) => {
+        const line = d.toString();
+        backendLogs += line;
+        if (backendLogs.length > 6000) backendLogs = backendLogs.slice(-6000);
+        console.log(`[preview:backend:${projectId}] ${line.trim()}`);
+      });
       backendProc.on('exit', (code) => {
         console.log(`[preview:backend:${projectId}] exited with code ${code}`);
       });
+
+      try {
+        await waitForPort(backendPort, 60000);
+      } catch {
+        throw new Error(`Backend failed to start. ${backendLogs.trim() || 'No backend logs.'}`);
+      }
     }
 
     // Step 4: Start frontend dev server
     let frontendProc = null;
+    let frontendLogs = '';
     if (hasClient) {
-      frontendProc = spawn('npx', ['vite', '--host'], {
+      const clientPkg = readPackageJson(clientDir);
+      const clientScript = getScriptCommand(clientPkg, ['dev']);
+      const frontendCommand = clientScript ? 'npm' : 'npx';
+      const frontendArgs = clientScript
+        ? ['run', clientScript, '--', '--host', '127.0.0.1', '--port', String(frontendPort), '--strictPort']
+        : ['vite', '--host', '127.0.0.1', '--port', String(frontendPort), '--strictPort'];
+
+      frontendProc = spawn(frontendCommand, frontendArgs, {
         cwd: clientDir,
         shell: true,
         stdio: 'pipe',
+        env: {
+          ...process.env,
+          VITE_API_BASE_URL: '/api',
+        },
       });
-      frontendProc.stdout.on('data', (d) => console.log(`[preview:frontend:${projectId}] ${d.toString().trim()}`));
-      frontendProc.stderr.on('data', (d) => console.log(`[preview:frontend:${projectId}] ${d.toString().trim()}`));
+      frontendProc.stdout.on('data', (d) => {
+        const line = d.toString();
+        frontendLogs += line;
+        if (frontendLogs.length > 6000) frontendLogs = frontendLogs.slice(-6000);
+        console.log(`[preview:frontend:${projectId}] ${line.trim()}`);
+      });
+      frontendProc.stderr.on('data', (d) => {
+        const line = d.toString();
+        frontendLogs += line;
+        if (frontendLogs.length > 6000) frontendLogs = frontendLogs.slice(-6000);
+        console.log(`[preview:frontend:${projectId}] ${line.trim()}`);
+      });
       frontendProc.on('exit', (code) => {
         console.log(`[preview:frontend:${projectId}] exited with code ${code}`);
       });
@@ -184,7 +244,11 @@ export default defineConfig({
 
     // Wait for frontend to be ready
     if (hasClient) {
-      await waitForPort(frontendPort, 90000);
+      try {
+        await waitForPort(frontendPort, 90000);
+      } catch {
+        throw new Error(`Frontend failed to start. ${frontendLogs.trim() || 'No frontend logs.'}`);
+      }
     }
 
     const frontendUrl = hasClient ? `http://localhost:${frontendPort}` : null;

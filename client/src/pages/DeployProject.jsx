@@ -89,7 +89,7 @@ export default function DeployProject() {
             setProject((prev) => ({ ...prev, deploy_url: dep.url, deploy_platform: dep.platform }));
             toast.success(`Deployed successfully! ${dep.url}`);
           } else {
-            toast.error('Deployment failed');
+            toast.error(dep.logs || 'Deployment failed');
           }
         }
       } catch {
@@ -257,16 +257,16 @@ export default function DeployProject() {
             </button>
           </div>
 
-          {platform === 'render' && !project.github_repo_url && (
+          {!project.github_repo_url && (
             <div className="flex items-center space-x-2 p-3 bg-yellow-900/20 border border-yellow-800/30 rounded-lg text-yellow-400 text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>Push to GitHub first to deploy on Render.</span>
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>Push to GitHub first to deploy on {platform === 'vercel' ? 'Vercel' : 'Render'}.</span>
             </div>
           )}
 
           <button
             onClick={handleDeploy}
-            disabled={deploying || (platform === 'render' && !project.github_repo_url)}
+            disabled={deploying || !project.github_repo_url}
             className="btn-primary w-full flex items-center justify-center space-x-2"
           >
             {deploying ? (
@@ -290,37 +290,42 @@ export default function DeployProject() {
           <h3 className="text-lg font-semibold mb-4">Deployment History</h3>
           <div className="space-y-3">
             {deployments.map((dep) => (
-              <div key={dep.id} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <span className={`w-2 h-2 rounded-full ${
-                    dep.status === 'deployed' ? 'bg-green-400' :
-                    dep.status === 'deploying' ? 'bg-yellow-400 animate-pulse' :
-                    'bg-red-400'
-                  }`} />
-                  <div>
-                    <p className="text-sm font-medium capitalize">{dep.platform}</p>
-                    <p className="text-xs text-gray-500">{new Date(dep.created_at).toLocaleString()}</p>
+              <div key={dep.id} className="p-3 bg-gray-800 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className={`w-2 h-2 rounded-full ${
+                      dep.status === 'deployed' ? 'bg-green-400' :
+                      dep.status === 'deploying' ? 'bg-yellow-400 animate-pulse' :
+                      'bg-red-400'
+                    }`} />
+                    <div>
+                      <p className="text-sm font-medium capitalize">{dep.platform}</p>
+                      <p className="text-xs text-gray-500">{new Date(dep.created_at).toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      dep.status === 'deployed' ? 'bg-green-400/10 text-green-400' :
+                      dep.status === 'deploying' ? 'bg-yellow-400/10 text-yellow-400' :
+                      'bg-red-400/10 text-red-400'
+                    }`}>
+                      {dep.status}
+                    </span>
+                    {dep.url && (
+                      <a
+                        href={dep.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-orange-400 hover:text-orange-300"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    dep.status === 'deployed' ? 'bg-green-400/10 text-green-400' :
-                    dep.status === 'deploying' ? 'bg-yellow-400/10 text-yellow-400' :
-                    'bg-red-400/10 text-red-400'
-                  }`}>
-                    {dep.status}
-                  </span>
-                  {dep.url && (
-                    <a
-                      href={dep.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-orange-400 hover:text-orange-300"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
+                {dep.status === 'failed' && dep.logs && (
+                  <p className="text-xs text-red-300 mt-2 wrap-break-word">{dep.logs}</p>
+                )}
               </div>
             ))}
           </div>

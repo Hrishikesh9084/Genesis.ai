@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Code, Eye, Edit3, Github, Rocket, Trash2, RefreshCw, Download, Loader2 } from 'lucide-react';
+import { Code, Eye, Edit3, Github, Rocket, Trash2, RefreshCw, Download, Loader2, X } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import api from '../services/api';
@@ -84,6 +84,16 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleStopGeneration = async () => {
+    try {
+      await api.post(`/projects/${id}/cancel`);
+      toast.success('Generation stopped');
+      setProject((prev) => ({ ...prev, status: 'cancelled' }));
+    } catch (err) {
+      toast.error('Failed to stop generation');
+    }
+  };
+
   const handleDownload = async () => {
     const zip = new JSZip();
     for (const [filePath, content] of Object.entries(files)) {
@@ -116,6 +126,31 @@ export default function ProjectDetail() {
               ))}
             </div>
           </div>
+          <button
+            onClick={handleStopGeneration}
+            className="mt-8 inline-flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+          >
+            <X className="w-4 h-4" />
+            <span>Stop Generation</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (project.status === 'cancelled') {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
+        <div className="card py-16">
+          <div className="w-16 h-16 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-3xl">⊘</span>
+          </div>
+          <h2 className="text-2xl font-bold mb-3">Generation Cancelled</h2>
+          <p className="text-gray-400 mb-6">The project generation was stopped.</p>
+          <button onClick={fetchProject} className="btn-primary inline-flex items-center space-x-2">
+            <RefreshCw className="w-5 h-5" />
+            <span>Retry Generation</span>
+          </button>
         </div>
       </div>
     );

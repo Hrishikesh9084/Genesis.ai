@@ -31,8 +31,6 @@ export function AuthProvider({ children }) {
 
   const register = async (name, email, password) => {
     const res = await api.post('/auth/register', { name, email, password });
-    localStorage.setItem('genesis_token', res.data.token);
-    setUser(res.data.user);
     return res.data;
   };
 
@@ -46,13 +44,33 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateProfile = async (payload) => {
+    const res = await api.put('/auth/profile', payload);
+    setUser(res.data.user);
+    return res.data.user;
+  };
+
+  const uploadProfileImage = async (file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const res = await api.post('/auth/profile-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
+    setUser(res.data.user);
+    return res.data.user;
+  };
+
   const logout = () => {
     localStorage.removeItem('genesis_token');
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, loginWithToken, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithToken, updateProfile, uploadProfileImage, logout }}>
       {children}
     </AuthContext.Provider>
   );

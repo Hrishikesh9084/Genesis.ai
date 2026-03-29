@@ -1,13 +1,79 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Github, Key, Save, Loader2, User } from 'lucide-react';
+import { Github, Key, Save, Loader2, User, Upload } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, updateProfile, uploadProfileImage } = useAuth();
   const [githubToken, setGithubToken] = useState('');
   const [saving, setSaving] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileImage, setProfileImage] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+
+  useEffect(() => {
+    setProfileName(user?.name || '');
+    setProfileImage(user?.avatar_url || '');
+  }, [user]);
+
+  const handleSaveProfile = async () => {
+    const trimmedName = profileName.trim();
+    const trimmedImage = profileImage.trim();
+
+    if (!trimmedName) {
+      toast.error('Name is required');
+      return;
+    }
+
+    if (trimmedImage && !/^https?:\/\//i.test(trimmedImage)) {
+      toast.error('Profile image URL must start with http:// or https://');
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      await updateProfile({
+        name: trimmedName,
+        avatar_url: trimmedImage,
+      });
+      toast.success('Profile updated');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleProfileImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be smaller than 5MB.');
+      event.target.value = '';
+      return;
+    }
+
+    setUploadingProfileImage(true);
+    try {
+      const updatedUser = await uploadProfileImage(file);
+      setProfileImage(updatedUser.avatar_url || '');
+      toast.success('Profile image uploaded');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload image');
+    } finally {
+      setUploadingProfileImage(false);
+      event.target.value = '';
+    }
+  };
 
   const handleSaveGithub = async () => {
     if (!githubToken.trim()) {
@@ -38,14 +104,72 @@ export default function Settings() {
           <h2 className="text-lg font-semibold">Profile</h2>
         </div>
         <div className="space-y-3">
+          <div className="flex items-center gap-4 pb-2">
+            <div className="relative">
+              {profileImage ? (
+                <img
+                  src={profileImage}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-full object-cover border border-gray-700"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-orange-500/20 border border-orange-400/30 flex items-center justify-center">
+                  <User className="w-7 h-7 text-orange-300" />
+                </div>
+              )}
+              <label
+                htmlFor="profile-image-file"
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-orange-500 text-white flex items-center justify-center cursor-pointer hover:bg-orange-600 transition"
+                title="Upload profile image"
+              >
+                <Upload className="w-3.5 h-3.5" />
+              </label>
+              <input
+                id="profile-image-file"
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handleProfileImageUpload}
+              />
+            </div>
+            <p className="text-xs text-gray-400">
+              {uploadingProfileImage ? 'Uploading image...' : 'Tap the upload icon to choose an image from your device.'}
+            </p>
+          </div>
           <div>
             <label className="block text-sm text-gray-400 mb-1">Name</label>
-            <p className="text-white  border border-white p-2 w-sm">{user?.name}</p>
+            <input
+              type="text"
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              className="input-field"
+              placeholder="Your name"
+            />
           </div>
           <div>
             <label className="block text-sm text-gray-400 mb-1">Email</label>
             <p className="text-white">{user?.email}</p>
           </div>
+          <div>
+            <label htmlFor="profile-image-url" className="block text-sm text-gray-400 mb-1">Profile image URL</label>
+            <input
+              id="profile-image-url"
+              type="url"
+              value={profileImage}
+              onChange={(e) => setProfileImage(e.target.value)}
+              className="input-field"
+              placeholder="https://example.com/avatar.jpg"
+            />
+            <p className="text-xs text-gray-500 mt-1">Leave empty to remove profile image.</p>
+          </div>
+          <button
+            onClick={handleSaveProfile}
+            disabled={savingProfile}
+            className="btn-primary inline-flex items-center space-x-2"
+          >
+            {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{savingProfile ? 'Saving...' : 'Save Profile'}</span>
+          </button>
         </div>
       </div>
 

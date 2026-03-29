@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -8,21 +8,28 @@ export default function GithubCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { loginWithToken } = useAuth();
+  const handledRef = useRef(false);
 
   useEffect(() => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+
     const handleCallback = async () => {
       const token = searchParams.get('token');
       const error = searchParams.get('error');
+      const provider = window.location.pathname.includes('/auth/google/callback')
+        ? 'Google'
+        : 'GitHub';
 
       if (error) {
-        toast.error('GitHub login failed. Please try again.');
+        toast.error(`${provider} login failed. Please try again.`, { id: 'oauth-login-status' });
         navigate('/login');
         return;
       }
 
       if (token) {
         await loginWithToken(token);
-        toast.success('Signed in with GitHub!');
+        toast.success(`Signed in with ${provider}!`, { id: 'oauth-login-status' });
         navigate('/dashboard');
       } else {
         navigate('/login');

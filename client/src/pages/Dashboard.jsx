@@ -27,6 +27,10 @@ export default function Dashboard() {
     }
   };
 
+  const handleProjectDelete = (deletedProjectId) => {
+    setProjects((prev) => prev.filter((p) => p.id !== deletedProjectId));
+  };
+
   const filtered = projects.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -74,7 +78,7 @@ export default function Dashboard() {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <ProjectCard key={project.id} project={project} onDelete={handleProjectDelete} />
           ))}
           {filtered.length === 0 && (
             <p className="text-gray-500 col-span-full text-center py-8">No projects match your search.</p>

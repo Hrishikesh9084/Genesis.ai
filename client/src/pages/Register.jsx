@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { Github, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { GITHUB_OAUTH_URL } from '../services/api';
+import { validateRegisterInput } from "../utils/validators";
 
 export default function Register() {
   const [name, setName] = useState("");
@@ -15,11 +16,17 @@ export default function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const validationError = validateRegisterInput({ name, email, password });
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     setLoading(true);
     try {
-      await register(name, email, password);
-      toast.success('Account created!');
-      navigate('/dashboard');
+      const response = await register(name, email, password);
+      toast.success(response.message || 'Account created. Please verify your email.');
+      navigate(`/login?verifyEmailSent=true&email=${encodeURIComponent(email)}`);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Registration failed');
     } finally {

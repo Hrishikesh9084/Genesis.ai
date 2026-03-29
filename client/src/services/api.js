@@ -9,6 +9,7 @@ export const API_BASE_URL =
   (rawApiBaseUrl || (isLocalhost ? 'http://localhost:5000/api' : 'https://genesis-ai-tu97.vercel.app/api')).replace(/\/+$/, '');
 
 export const GITHUB_OAUTH_URL = `${API_BASE_URL}/auth/github`;
+export const GOOGLE_OAUTH_URL = `${API_BASE_URL}/auth/google`;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -23,7 +24,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-const AUTH_EXEMPT_PATHS = ['/login', '/register', '/auth/github/callback', '/'];
+const AUTH_EXEMPT_PATHS = ['/login', '/register', '/auth/github/callback', '/auth/google/callback', '/'];
 
 api.interceptors.response.use(
   (response) => response,
