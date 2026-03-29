@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
   github_id VARCHAR(100) UNIQUE,
   github_token TEXT,
   avatar_url TEXT,
+  email_verification_status VARCHAR(10) NOT NULL DEFAULT 'false',
+  email_verification_error TEXT,
   email_verified_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -15,6 +17,12 @@ CREATE TABLE IF NOT EXISTS users (
 
 ALTER TABLE IF EXISTS users
 ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP;
+
+ALTER TABLE IF EXISTS users
+ADD COLUMN IF NOT EXISTS email_verification_status VARCHAR(10) NOT NULL DEFAULT 'false';
+
+ALTER TABLE IF EXISTS users
+ADD COLUMN IF NOT EXISTS email_verification_error TEXT;
 
 CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

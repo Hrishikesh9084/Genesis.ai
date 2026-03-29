@@ -4,6 +4,27 @@ import https from 'https';
 import db from '../config/db.js';
 import emailService from '../services/emailService.js';
 
+let ensureVerificationColumnsPromise;
+
+function ensureVerificationColumns() {
+  if (!ensureVerificationColumnsPromise) {
+    ensureVerificationColumnsPromise = db
+      .query(`
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS email_verification_status VARCHAR(10) NOT NULL DEFAULT 'false';
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS email_verification_error TEXT;
+      `)
+      .catch((err) => {
+        ensureVerificationColumnsPromise = null;
+        throw err;
+      });
+  }
+
+  return ensureVerificationColumnsPromise;
+}
+
 function generateToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, name: user.name },
@@ -176,6 +197,8 @@ async function sendVerificationEmail(req, user) {
 
 const register = async (req, res, next) => {
   try {
+    await ensureVerificationColumns();
+
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
@@ -195,7 +218,9 @@ const register = async (req, res, next) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const result = await db.query(
-      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, password, email_verified_at, created_at',
+      `INSERT INTO users (name, email, password, email_verification_status, email_verification_error)
+       VALUES ($1, $2, $3, 'false', NULL)
+       RETURNING id, name, email, password, email_verified_at, email_verification_status, email_verification_error, created_at`,
       [name, email, hashedPassword]
     );
 
@@ -256,8 +281,10 @@ const login = async (req, res, next) => {
 
 const getMe = async (req, res, next) => {
   try {
+    await ensureVerificationColumns();
+
     const result = await db.query(
-      'SELECT id, name, email, avatar_url, email_verified_at, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, email_verified_at, email_verification_status, email_verification_error, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -273,6 +300,8 @@ const getMe = async (req, res, next) => {
 
 const updateProfile = async (req, res, next) => {
   try {
+    await ensureVerificationColumns();
+
     const { name, avatar_url } = req.body || {};
 
     const nextName = name !== undefined ? String(name).trim() : null;
@@ -293,7 +322,7 @@ const updateProfile = async (req, res, next) => {
          END,
          updated_at = NOW()
        WHERE id = $3
-       RETURNING id, name, email, avatar_url, email_verified_at, created_at`,
+       RETURNING id, name, email, avatar_url, email_verified_at, email_verification_status, email_verification_error, created_at`,
       [nextName, nextAvatarRaw, req.user.id]
     );
 
@@ -309,6 +338,8 @@ const updateProfile = async (req, res, next) => {
 
 const uploadProfileImage = async (req, res, next) => {
   try {
+    await ensureVerificationColumns();
+
     if (!req.file) {
       return res.status(400).json({ error: 'Image file is required.' });
     }
@@ -319,7 +350,7 @@ const uploadProfileImage = async (req, res, next) => {
       `UPDATE users
        SET avatar_url = $1, updated_at = NOW()
        WHERE id = $2
-       RETURNING id, name, email, avatar_url, email_verified_at, created_at`,
+       RETURNING id, name, email, avatar_url, email_verified_at, email_verification_status, email_verification_error, created_at`,
       [avatarUrl, req.user.id]
     );
 
@@ -351,6 +382,8 @@ const updateGithubToken = async (req, res, next) => {
 
 const verifyEmail = async (req, res, next) => {
   try {
+    await ensureVerificationColumns();
+
     const id = req.query.id || req.body?.id;
     const token = req.query.token || req.body?.token;
 
@@ -358,7 +391,7 @@ const verifyEmail = async (req, res, next) => {
       return res.status(400).json({ error: 'id and token are required.' });
     }
 
-    const result = await db.query('SELECT id, name, email, password, email_verified_at FROM users WHERE id = $1', [id]);
+    const result = await db.query('SELECT id, name, email, password, email_verified_at, email_verification_status FROM users WHERE id = $1', [id]);
     if (result.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid or expired verification token.' });
     }
@@ -369,20 +402,36 @@ const verifyEmail = async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, secret);
       if (decoded.purpose !== 'email_verification' || decoded.id !== user.id) {
+        await db.query(
+          'UPDATE users SET email_verification_status = $1, email_verification_error = $2, updated_at = NOW() WHERE id = $3',
+          ['error', 'Invalid or expired verification token.', id]
+        );
         return res.status(400).json({ error: 'Invalid or expired verification token.' });
       }
     } catch {
+      await db.query(
+        'UPDATE users SET email_verification_status = $1, email_verification_error = $2, updated_at = NOW() WHERE id = $3',
+        ['error', 'Invalid or expired verification token.', id]
+      );
       return res.status(400).json({ error: 'Invalid or expired verification token.' });
     }
 
     const wasAlreadyVerified = Boolean(user.email_verified_at);
     if (!wasAlreadyVerified) {
-      await db.query('UPDATE users SET email_verified_at = NOW(), updated_at = NOW() WHERE id = $1', [id]);
+      await db.query(
+        'UPDATE users SET email_verified_at = NOW(), email_verification_status = $1, email_verification_error = NULL, updated_at = NOW() WHERE id = $2',
+        ['true', id]
+      );
       try {
         await emailService.sendWelcomeEmail({ to: user.email, name: user.name });
       } catch (emailErr) {
         console.error('Welcome email failed after verification:', emailErr.message);
       }
+    } else if (user.email_verification_status !== 'true') {
+      await db.query(
+        'UPDATE users SET email_verification_status = $1, email_verification_error = NULL, updated_at = NOW() WHERE id = $2',
+        ['true', id]
+      );
     }
 
     if (req.query.id && req.query.token) {
@@ -401,6 +450,8 @@ const verifyEmail = async (req, res, next) => {
 
 const resendVerificationEmail = async (req, res, next) => {
   try {
+    await ensureVerificationColumns();
+
     const { email } = req.body;
     if (!email) {
       return res.status(400).json({ error: 'Email is required.' });
@@ -413,6 +464,10 @@ const resendVerificationEmail = async (req, res, next) => {
 
     const user = result.rows[0];
     if (!user.email_verified_at) {
+      await db.query(
+        'UPDATE users SET email_verification_status = $1, email_verification_error = NULL, updated_at = NOW() WHERE id = $2',
+        ['false', user.id]
+      );
       try {
         await sendVerificationEmail(req, user);
       } catch (emailErr) {
@@ -523,6 +578,8 @@ const githubRedirect = (req, res) => {
 // GitHub OAuth: handle callback, exchange code for token, find/create user
 const githubCallback = async (req, res, next) => {
   try {
+    await ensureVerificationColumns();
+
     const clientBaseUrl = resolveClientBaseUrl(req);
     const { code } = req.query;
     if (!code) {
@@ -594,13 +651,16 @@ const githubCallback = async (req, res, next) => {
       // Update existing user with latest GitHub info
       user = userResult.rows[0];
       await db.query(
-        'UPDATE users SET github_id = $1, github_token = $2, avatar_url = $3, email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $4',
-        [githubId, accessToken, avatarUrl, user.id]
+        'UPDATE users SET github_id = $1, github_token = $2, avatar_url = $3, email_verified_at = COALESCE(email_verified_at, NOW()), email_verification_status = $4, email_verification_error = NULL, updated_at = NOW() WHERE id = $5',
+        [githubId, accessToken, avatarUrl, 'true', user.id]
       );
     } else {
       // Create new user (no password needed for OAuth)
       const result = await db.query(
-        'INSERT INTO users (name, email, github_id, github_token, avatar_url, password, email_verified_at) VALUES ($1, $2, $3, $4, $5, $6, NOW()) RETURNING *',
+        `INSERT INTO users
+         (name, email, github_id, github_token, avatar_url, password, email_verified_at, email_verification_status, email_verification_error)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), 'true', NULL)
+         RETURNING *`,
         [name, email, githubId, accessToken, avatarUrl, 'GITHUB_OAUTH']
       );
       user = result.rows[0];
@@ -642,6 +702,8 @@ const googleRedirect = (req, res) => {
 
 const googleCallback = async (req, res) => {
   try {
+    await ensureVerificationColumns();
+
     const clientBaseUrl = resolveClientBaseUrl(req);
     const { code, error, error_description: errorDescription } = req.query;
 
@@ -704,12 +766,15 @@ const googleCallback = async (req, res) => {
     if (existingUserResult.rows.length > 0) {
       user = existingUserResult.rows[0];
       await db.query(
-        'UPDATE users SET avatar_url = COALESCE($1, avatar_url), email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = $2',
-        [avatarUrl, user.id]
+        'UPDATE users SET avatar_url = COALESCE($1, avatar_url), email_verified_at = COALESCE(email_verified_at, NOW()), email_verification_status = $2, email_verification_error = NULL, updated_at = NOW() WHERE id = $3',
+        [avatarUrl, 'true', user.id]
       );
     } else {
       const insertResult = await db.query(
-        'INSERT INTO users (name, email, avatar_url, password, email_verified_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *',
+        `INSERT INTO users
+         (name, email, avatar_url, password, email_verified_at, email_verification_status, email_verification_error)
+         VALUES ($1, $2, $3, $4, NOW(), 'true', NULL)
+         RETURNING *`,
         [name, email, avatarUrl, 'GOOGLE_OAUTH']
       );
       user = insertResult.rows[0];
