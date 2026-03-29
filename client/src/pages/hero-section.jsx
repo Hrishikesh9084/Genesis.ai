@@ -17,6 +17,7 @@ export default function HeroSection() {
                 <div className="absolute rounded-full top-0 left-1/2 -translate-x-1/2 size-130 bg-[#F26A06] blur-[100px]" /> */}
             </motion.div>
             <motion.section className="flex flex-col items-center">
+               
                 <motion.div className="flex items-center gap-3 mt-24"
                     initial={{ y: -20, opacity: 0 }}
                     whileInView={{ y: 0, opacity: 1 }}
@@ -28,13 +29,13 @@ export default function HeroSection() {
                         Launch App
                     </Link>
                 </motion.div>
-                <motion.h1 className="text-center text-4xl/13 md:text-6xl/19 mt-4 font-semibold tracking-tight max-w-3xl"
+                <motion.h1 className="text-center text-4xl/13 md:text-5xl/19 mt-4 font-semibold tracking-tight max-w-3xl"
                     initial={{ y: 50, opacity: 0 }}
                     whileInView={{ y: 0, opacity: 1 }}
                     viewport={{ once: true }}
                     transition={{ type: "spring", stiffness: 240, damping: 70, mass: 1 }}
                 >
-                    Build, Deploy and Talk to AI Agents in Seconds.
+                    Turn your idea into a full app, deploy it, and chat with AI agents in one place.
                 </motion.h1>
                 <motion.p className="text-center text-gray-100 text-base/7 max-w-md mt-6"
                     initial={{ y: 50, opacity: 0 }}
@@ -51,7 +52,7 @@ export default function HeroSection() {
                     viewport={{ once: true }}
                     transition={{ type: "spring", stiffness: 320, damping: 70, mass: 1 }}
                 >
-                    <Link to="/register" className="btn max-md:w-full bg-gradient-to-r from-orange-500 to-orange-600 border-0 shadow-lg shadow-orange-500/25 py-3 text-center">
+                    <Link to="/register" className="btn max-md:w-full bg-linear-to-r from-orange-500 to-orange-600 border-0 shadow-lg shadow-orange-500/25 py-3 text-center">
                         Get Started Free
                     </Link>
                     <Link to="/plans" className="btn max-md:w-full glass flex items-center justify-center gap-2 py-3">
@@ -59,6 +60,9 @@ export default function HeroSection() {
                         View Plans
                     </Link>
                 </motion.div>
+                    <div className="w-3/4 py-2.5 font-medium text-sm text-center mt-5 text-gray-700 hover:text-gray-500 duration-300 transition-all">
+                        This application is in development. The developer is actively working <br /> to improve features, performance, and stability.
+                    </div>
             </motion.section>
         </>
     );

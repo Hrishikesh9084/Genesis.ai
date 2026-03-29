@@ -17,6 +17,12 @@ const editExamples = [
   'Add error handling and loading states to all API calls',
 ];
 
+const LOCKED_MODEL_ID = 'gemini-2.5-pro';
+
+function isModelAllowed(modelId) {
+  return modelId === LOCKED_MODEL_ID || modelId.startsWith('mistral-');
+}
+
 export default function EditProject() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -38,6 +44,7 @@ export default function EditProject() {
           google: {
             label: 'Google',
             models: [
+              { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', desc: 'Best Gemini quality' },
               { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Balanced speed and quality' },
               { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Fast & efficient' },
             ],
@@ -71,7 +78,8 @@ export default function EditProject() {
     try {
       const res = await api.get(`/projects/${id}`);
       setProject(res.data.project);
-      setModel(res.data.project.model || 'gemini-2.5-flash');
+      const existingModel = res.data.project.model;
+      setModel(isModelAllowed(existingModel) ? existingModel : LOCKED_MODEL_ID);
     } catch (err) {
       toast.error('Failed to load project');
       navigate('/dashboard');
@@ -154,21 +162,29 @@ export default function EditProject() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {provider.models.map((m) => {
                     const selected = model === m.id;
+                    const disabled = !isModelAllowed(m.id);
                     return (
                       <button
                         key={m.id}
                         type="button"
-                        onClick={() => setModel(m.id)}
+                        onClick={() => {
+                          if (!disabled) setModel(m.id);
+                        }}
+                        disabled={disabled}
                         className={`text-left p-3 rounded-xl border-2 transition-all ${
                           selected
                             ? 'border-orange-500 bg-orange-500/10'
-                            : 'border-gray-700/60 bg-gray-800/40 hover:border-gray-600'
+                            : disabled
+                              ? 'border-gray-800 bg-gray-900/40 text-gray-500 cursor-not-allowed opacity-60'
+                              : 'border-gray-700/60 bg-gray-800/40 hover:border-gray-600'
                         }`}
+                        aria-disabled={disabled}
                       >
                         <div className={`text-sm font-medium ${selected ? 'text-orange-400' : 'text-gray-200'}`}>
                           {m.name}
                         </div>
                         {m.desc && <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>}
+                        {disabled && <div className="text-[11px] text-gray-600 mt-1">Disabled</div>}
                       </button>
                     );
                   })}

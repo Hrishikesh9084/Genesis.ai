@@ -14,6 +14,12 @@ const promptExamples = [
   "Create a recipe sharing platform with search, ratings, and user collections",
 ];
 
+const LOCKED_MODEL_ID = "gemini-2.5-pro";
+
+function isModelAllowed(modelId) {
+  return modelId === LOCKED_MODEL_ID || modelId.startsWith("mistral-");
+}
+
 export default function NewProject() {
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -51,13 +57,18 @@ export default function NewProject() {
       .get("/projects/models")
       .then((res) => {
         setProviders(res.data.providers);
-        setModel(res.data.default);
+        setModel(LOCKED_MODEL_ID);
       })
       .catch(() => {
         setProviders({
           google: {
             label: "Google",
             models: [
+              {
+                id: "gemini-2.5-pro",
+                name: "Gemini 2.5 Pro",
+                desc: "Best Gemini quality",
+              },
               {
                 id: "gemini-2.5-flash",
                 name: "Gemini 2.5 Flash",
@@ -116,7 +127,7 @@ export default function NewProject() {
             ],
           },
         });
-        setModel("gemini-2.5-flash");
+        setModel(LOCKED_MODEL_ID);
       });
   }, []);
 
@@ -223,23 +234,32 @@ export default function NewProject() {
                       </p>
                       {provider.models.map((m) => {
                         const selected = model === m.id;
+                        const disabled = !isModelAllowed(m.id);
                         return (
                           <button
                             key={m.id}
                             type="button"
                             onClick={() => {
+                              if (disabled) return;
                               setModel(m.id);
                               setIsModelDropdownOpen(false);
                             }}
+                            disabled={disabled}
                             className={`w-full flex items-start justify-between gap-2 text-left px-3 py-2 rounded-lg transition-colors ${
-                              selected ? "bg-orange-500/15 text-orange-300" : "text-gray-200 hover:bg-gray-800"
+                              selected
+                                ? "bg-orange-500/15 text-orange-300"
+                                : disabled
+                                  ? "text-gray-500 cursor-not-allowed opacity-60"
+                                  : "text-gray-200 hover:bg-gray-800"
                             }`}
                             role="option"
                             aria-selected={selected}
+                            aria-disabled={disabled}
                           >
                             <span>
                               <span className="block text-sm font-medium">{m.name}</span>
                               {m.desc && <span className="block text-xs text-gray-500 mt-0.5">{m.desc}</span>}
+                              {disabled && <span className="block text-[11px] text-gray-600 mt-0.5">Disabled</span>}
                             </span>
                             {selected && <Check className="w-4 h-4 mt-0.5 shrink-0" />}
                           </button>
