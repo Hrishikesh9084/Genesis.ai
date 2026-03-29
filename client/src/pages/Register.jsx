@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Github, Loader2 } from "lucide-react";
+import { Chrome, Github, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { GITHUB_OAUTH_URL } from '../services/api';
+import { GITHUB_OAUTH_URL, GOOGLE_OAUTH_URL } from '../services/api';
 import { validateRegisterInput } from "../utils/validators";
 
 export default function Register() {
@@ -95,6 +95,14 @@ export default function Register() {
             <span className="bg-gray-900/50 px-3 text-gray-500">or</span>
           </div>
         </div>
+
+        <a
+          href={GOOGLE_OAUTH_URL}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-gray-700/60 bg-white text-gray-900 hover:bg-gray-100 transition-all"
+        >
+          <Chrome className="w-5 h-5" />
+          <span>Continue with Google</span>
+        </a>
 
         <a
           href={GITHUB_OAUTH_URL}
