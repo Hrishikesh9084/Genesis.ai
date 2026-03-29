@@ -52,8 +52,64 @@ function redirectWithOAuthLog(res, label, url, provider = 'OAuth') {
   return res.redirect(url);
 }
 
+function isLocalhostUrl(value) {
+  if (!value) return false;
+
+  try {
+    const parsed = new URL(String(value).trim());
+    const hostname = String(parsed.hostname || '').toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+  } catch {
+    const lower = String(value).trim().toLowerCase();
+    return lower.includes('localhost') || lower.includes('127.0.0.1') || lower.includes('0.0.0.0');
+  }
+}
+
+function isLocalhostHost(value) {
+  const host = String(value || '').trim().toLowerCase();
+  if (!host) return false;
+
+  const hostname = host.split(':')[0];
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+}
+
+function isProduction() {
+  return String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+}
+
+function shouldIgnoreLocalhostEnvUrl(req, urlValue) {
+  if (!isLocalhostUrl(urlValue)) return false;
+
+  const forwardedHost = req?.headers?.['x-forwarded-host'];
+  const hostHeader = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost;
+  const requestHost = hostHeader || req?.get?.('host') || '';
+
+  // Keep localhost values only when handling true local requests.
+  if (isLocalhostHost(requestHost)) return false;
+
+  // If request is from a real host, localhost env URLs are invalid and must be ignored.
+  return Boolean(requestHost);
+}
+
+function sanitizeEnvUrl(req, urlValue, label) {
+  const raw = urlValue?.trim();
+  if (!raw) return null;
+
+  if (isProduction() && isLocalhostUrl(raw)) {
+    console.warn(`[Auth URL Resolver] Ignoring ${label} because it points to localhost in production: ${raw}`);
+    return null;
+  }
+
+  if (shouldIgnoreLocalhostEnvUrl(req, raw)) {
+    console.warn(`[Auth URL Resolver] Ignoring ${label} because request host is non-local while env URL is localhost: ${raw}`);
+    return null;
+  }
+
+  return raw.replace(/\/$/, '');
+}
+
 function resolveGithubRedirectUri(req) {
-  const envRedirectUri = process.env.GITHUB_REDIRECT_URI?.trim();
+  const envRedirectUri = sanitizeEnvUrl(req, process.env.GITHUB_REDIRECT_URI, 'GITHUB_REDIRECT_URI');
   if (envRedirectUri) return envRedirectUri;
 
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -63,7 +119,7 @@ function resolveGithubRedirectUri(req) {
 }
 
 function resolveGoogleRedirectUri(req) {
-  const envRedirectUri = process.env.GOOGLE_REDIRECT_URI?.trim();
+  const envRedirectUri = sanitizeEnvUrl(req, process.env.GOOGLE_REDIRECT_URI, 'GOOGLE_REDIRECT_URI');
   if (envRedirectUri) return envRedirectUri;
 
   const forwardedProto = req.headers['x-forwarded-proto'];
@@ -73,13 +129,25 @@ function resolveGoogleRedirectUri(req) {
 }
 
 function resolveApiBaseUrl(req) {
-  const envApiUrl = process.env.API_URL?.trim();
-  if (envApiUrl) return envApiUrl.replace(/\/$/, '');
+  const envApiUrl = sanitizeEnvUrl(req, process.env.API_URL, 'API_URL');
+  if (envApiUrl) return envApiUrl;
 
   const forwardedProto = req.headers['x-forwarded-proto'];
   const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.get('host');
   return `${protocol}://${host}`;
+}
+
+function resolveClientBaseUrl(req) {
+  const envClientUrl = sanitizeEnvUrl(req, process.env.CLIENT_URL, 'CLIENT_URL');
+  if (envClientUrl) return envClientUrl;
+
+  const originHeader = req.headers.origin;
+  const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
+  const safeOrigin = sanitizeEnvUrl(req, origin || '', 'Origin header');
+  if (safeOrigin) return safeOrigin;
+
+  return resolveServerBaseUrl(req);
 }
 
 function resolveServerBaseUrl(req) {
@@ -318,7 +386,7 @@ const verifyEmail = async (req, res, next) => {
     }
 
     if (req.query.id && req.query.token) {
-      const successRedirect = `${process.env.CLIENT_URL}/login?verified=true`;
+      const successRedirect = `${resolveClientBaseUrl(req)}/login?verified=true`;
       return res.redirect(successRedirect);
     }
 
@@ -375,7 +443,7 @@ const forgotPassword = async (req, res, next) => {
     const user = result.rows[0];
     const secret = `${process.env.JWT_SECRET}${user.password}`;
     const resetToken = jwt.sign({ id: user.id, email: user.email }, secret, { expiresIn: '15m' });
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password?id=${encodeURIComponent(user.id)}&token=${encodeURIComponent(resetToken)}`;
+    const resetUrl = `${resolveClientBaseUrl(req)}/reset-password?id=${encodeURIComponent(user.id)}&token=${encodeURIComponent(resetToken)}`;
 
     try {
       await emailService.sendPasswordResetEmail({
@@ -455,9 +523,10 @@ const githubRedirect = (req, res) => {
 // GitHub OAuth: handle callback, exchange code for token, find/create user
 const githubCallback = async (req, res, next) => {
   try {
+    const clientBaseUrl = resolveClientBaseUrl(req);
     const { code } = req.query;
     if (!code) {
-      const redirectUrl = `${process.env.CLIENT_URL}/login?error=github_no_code`;
+      const redirectUrl = `${clientBaseUrl}/login?error=github_no_code`;
       return redirectWithOAuthLog(res, 'missing_code_redirect', redirectUrl);
     }
 
@@ -478,7 +547,7 @@ const githubCallback = async (req, res, next) => {
 
     const tokenData = JSON.parse(tokenResponse);
     if (tokenData.error || !tokenData.access_token) {
-      const redirectUrl = `${process.env.CLIENT_URL}/login?error=github_token_failed`;
+      const redirectUrl = `${clientBaseUrl}/login?error=github_token_failed`;
       return redirectWithOAuthLog(res, 'token_exchange_failed_redirect', redirectUrl);
     }
 
@@ -540,11 +609,11 @@ const githubCallback = async (req, res, next) => {
     const token = generateToken(user);
 
     // Redirect to client with JWT token
-    const redirectUrl = `${process.env.CLIENT_URL}/auth/github/callback?token=${token}`;
+    const redirectUrl = `${clientBaseUrl}/auth/github/callback?token=${token}`;
     return redirectWithOAuthLog(res, 'oauth_success_redirect', redirectUrl, 'GitHub OAuth');
   } catch (err) {
     console.error('GitHub OAuth error:', err);
-    const redirectUrl = `${process.env.CLIENT_URL}/login?error=github_failed`;
+    const redirectUrl = `${resolveClientBaseUrl(req)}/login?error=github_failed`;
     return redirectWithOAuthLog(res, 'oauth_error_redirect', redirectUrl, 'GitHub OAuth');
   }
 };
@@ -573,17 +642,18 @@ const googleRedirect = (req, res) => {
 
 const googleCallback = async (req, res) => {
   try {
+    const clientBaseUrl = resolveClientBaseUrl(req);
     const { code, error, error_description: errorDescription } = req.query;
 
     if (error) {
       const safeError = String(error);
       const safeDescription = encodeURIComponent(String(errorDescription || ''));
-      const redirectUrl = `${process.env.CLIENT_URL}/login?error=google_${encodeURIComponent(safeError)}${safeDescription ? `&error_description=${safeDescription}` : ''}`;
+      const redirectUrl = `${clientBaseUrl}/login?error=google_${encodeURIComponent(safeError)}${safeDescription ? `&error_description=${safeDescription}` : ''}`;
       return redirectWithOAuthLog(res, 'provider_error_redirect', redirectUrl, 'Google OAuth');
     }
 
     if (!code) {
-      const redirectUrl = `${process.env.CLIENT_URL}/login?error=google_no_code`;
+      const redirectUrl = `${clientBaseUrl}/login?error=google_no_code`;
       return redirectWithOAuthLog(res, 'missing_code_redirect', redirectUrl, 'Google OAuth');
     }
 
@@ -611,7 +681,7 @@ const googleCallback = async (req, res) => {
 
     const tokenData = JSON.parse(tokenResponseRaw || '{}');
     if (tokenData.error || !tokenData.access_token) {
-      const redirectUrl = `${process.env.CLIENT_URL}/login?error=google_token_failed`;
+      const redirectUrl = `${clientBaseUrl}/login?error=google_token_failed`;
       return redirectWithOAuthLog(res, 'token_exchange_failed_redirect', redirectUrl, 'Google OAuth');
     }
 
@@ -621,7 +691,7 @@ const googleCallback = async (req, res) => {
 
     const email = googleUser.email;
     if (!email) {
-      const redirectUrl = `${process.env.CLIENT_URL}/login?error=google_no_email`;
+      const redirectUrl = `${clientBaseUrl}/login?error=google_no_email`;
       return redirectWithOAuthLog(res, 'missing_email_redirect', redirectUrl, 'Google OAuth');
     }
 
@@ -646,11 +716,11 @@ const googleCallback = async (req, res) => {
     }
 
     const token = generateToken(user);
-    const redirectUrl = `${process.env.CLIENT_URL}/auth/google/callback?token=${token}`;
+    const redirectUrl = `${clientBaseUrl}/auth/google/callback?token=${token}`;
     return redirectWithOAuthLog(res, 'oauth_success_redirect', redirectUrl, 'Google OAuth');
   } catch (err) {
     console.error('Google OAuth error:', err);
-    const redirectUrl = `${process.env.CLIENT_URL}/login?error=google_failed`;
+    const redirectUrl = `${resolveClientBaseUrl(req)}/login?error=google_failed`;
     return redirectWithOAuthLog(res, 'oauth_error_redirect', redirectUrl, 'Google OAuth');
   }
 };
