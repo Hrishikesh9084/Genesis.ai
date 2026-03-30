@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Code, Eye, Edit3, Github, Rocket, Trash2, RefreshCw, Download, Loader2, X } from 'lucide-react';
+import { Code, Edit3, Rocket, Trash2, RefreshCw, Download, Loader2, X } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import api from '../services/api';
 import FileTree from '../components/FileTree';
 import CodeEditor from '../components/CodeEditor';
-import PreviewPane from '../components/PreviewPane';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -15,7 +14,6 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('code');
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState({});
   const [saving, setSaving] = useState(false);
@@ -185,24 +183,10 @@ export default function ProjectDetail() {
           <span className="text-xs text-gray-500">{fileCount} files</span>
 
           <div className="flex items-center bg-gray-800 rounded-lg p-0.5">
-            <button
-              onClick={() => setActiveTab('code')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
-                activeTab === 'code' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
+            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-sm bg-orange-600 text-white">
               <Code className="w-4 h-4" />
               <span>Code</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('preview')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
-                activeTab === 'preview' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              <Eye className="w-4 h-4" />
-              <span>Preview</span>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -229,34 +213,28 @@ export default function ProjectDetail() {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {activeTab === 'code' ? (
-          <>
-            {/* File tree sidebar */}
-            <div className="w-64 bg-gray-900 border-r border-gray-800 overflow-y-auto flex-shrink-0">
-              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Files
-              </div>
-              <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
-            </div>
+        {/* File tree sidebar */}
+        <div className="w-64 bg-gray-900 border-r border-gray-800 overflow-y-auto flex-shrink-0">
+          <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Files
+          </div>
+          <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
+        </div>
 
-            {/* Code editor */}
-            <div className="flex-1 overflow-hidden">
-              {selectedFile ? (
-                <CodeEditor
-                  filePath={selectedFile}
-                  content={files[selectedFile] || ''}
-                  onChange={handleFileChange}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  Select a file to view
-                </div>
-              )}
+        {/* Code editor */}
+        <div className="flex-1 overflow-hidden">
+          {selectedFile ? (
+            <CodeEditor
+              filePath={selectedFile}
+              content={files[selectedFile] || ''}
+              onChange={handleFileChange}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-gray-500">
+              Select a file to view
             </div>
-          </>
-        ) : (
-          <PreviewPane projectId={id} files={files} />
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

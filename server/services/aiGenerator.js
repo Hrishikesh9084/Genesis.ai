@@ -194,6 +194,37 @@ function extractJsonObject(text) {
   }
 }
 
+function isLikelyTruncatedJson(text) {
+  const cleaned = cleanJsonResponse(text);
+  if (!cleaned.startsWith('{')) return true;
+  if (!cleaned.endsWith('}')) return true;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (const ch of cleaned) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') depth += 1;
+    if (ch === '}') depth -= 1;
+    if (depth < 0) return true;
+  }
+
+  return inString || depth !== 0;
+}
+
 function normalizeFilesMap(rawFiles) {
   const maybeNested = rawFiles?.files && typeof rawFiles.files === 'object' ? rawFiles.files : rawFiles;
   if (!maybeNested || typeof maybeNested !== 'object' || Array.isArray(maybeNested)) {
@@ -280,6 +311,27 @@ function ensureCoreFiles(files, prompt) {
   }
   if (!output['server/package.json']) {
     output['server/package.json'] = fallbackServerPackage();
+  }
+
+  // Drop generated dependency/build artifacts that commonly break previews.
+  for (const filePath of Object.keys(output)) {
+    if (
+      filePath.startsWith('client/node_modules/') ||
+      filePath.startsWith('server/node_modules/') ||
+      filePath.startsWith('client/dist/') ||
+      filePath.startsWith('server/dist/') ||
+      filePath.startsWith('client/.next/') ||
+      filePath.startsWith('server/.next/') ||
+      filePath.startsWith('client/.nuxt/') ||
+      filePath.startsWith('server/.nuxt/') ||
+      filePath.startsWith('client/.svelte-kit/') ||
+      filePath.startsWith('server/.svelte-kit/') ||
+      filePath.endsWith('package-lock.json') ||
+      filePath.endsWith('pnpm-lock.yaml') ||
+      filePath.endsWith('yarn.lock')
+    ) {
+      delete output[filePath];
+    }
   }
 
   if (!output['server/index.js']) {
@@ -390,6 +442,52 @@ export default defineConfig({
 `;
   }
 
+  try {
+    const clientPkg = JSON.parse(output['client/package.json']);
+    clientPkg.name = clientPkg.name || 'client';
+    clientPkg.private = true;
+    clientPkg.version = clientPkg.version || '1.0.0';
+    clientPkg.type = clientPkg.type || 'module';
+    clientPkg.scripts = clientPkg.scripts || {};
+    if (!clientPkg.scripts.dev) clientPkg.scripts.dev = 'vite';
+    if (!clientPkg.scripts.build) clientPkg.scripts.build = 'vite build';
+    if (!clientPkg.scripts.preview) clientPkg.scripts.preview = 'vite preview';
+    clientPkg.dependencies = clientPkg.dependencies || {};
+    if (!clientPkg.dependencies.react) clientPkg.dependencies.react = '^18.2.0';
+    if (!clientPkg.dependencies['react-dom']) clientPkg.dependencies['react-dom'] = '^18.2.0';
+    clientPkg.devDependencies = clientPkg.devDependencies || {};
+    if (!clientPkg.devDependencies.vite) clientPkg.devDependencies.vite = '^5.2.0';
+    output['client/package.json'] = JSON.stringify(clientPkg, null, 2);
+  } catch {
+    output['client/package.json'] = fallbackClientPackage();
+  }
+
+  try {
+    const serverPkg = JSON.parse(output['server/package.json']);
+    serverPkg.name = serverPkg.name || 'server';
+    serverPkg.version = serverPkg.version || '1.0.0';
+    serverPkg.type = serverPkg.type || 'module';
+    serverPkg.scripts = serverPkg.scripts || {};
+    if (!serverPkg.scripts.start && !serverPkg.scripts.dev) {
+      serverPkg.scripts.start = 'node index.js';
+    }
+    serverPkg.dependencies = serverPkg.dependencies || {};
+    if (!serverPkg.dependencies.express) serverPkg.dependencies.express = '^4.21.0';
+    if (!serverPkg.dependencies.cors) serverPkg.dependencies.cors = '^2.8.5';
+    output['server/package.json'] = JSON.stringify(serverPkg, null, 2);
+  } catch {
+    output['server/package.json'] = fallbackServerPackage();
+  }
+
+  if (typeof output['server/index.js'] === 'string' && !output['server/index.js'].includes('/api/health')) {
+    output['server/index.js'] += `
+
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+`;
+  }
+
   return output;
 }
 
@@ -397,6 +495,34 @@ function parseAndValidateFiles(content, prompt) {
   const json = extractJsonObject(content);
   const normalized = normalizeFilesMap(json);
   return ensureCoreFiles(normalized, prompt);
+}
+
+async function generateWithModel(modelId, userPrompt, promptForFallback) {
+  const strictUserPrompt = `${userPrompt}
+
+CRITICAL OUTPUT RULES:
+- Output must be a single valid JSON object only.
+- Do not wrap in markdown.
+- Do not include explanatory text.
+- Keep implementation concise and working over feature breadth.
+- Do not include node_modules, dist, build output, or lock files.`;
+
+  let lastErr = null;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const content = await callModel(modelId, SYSTEM_PROMPT, strictUserPrompt);
+      const files = parseAndValidateFiles(content, promptForFallback);
+      return files;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 3 && isLikelyTruncatedJson(err?.message ? String(err.message) : '')) {
+        continue;
+      }
+    }
+  }
+
+  throw lastErr || new Error('Generation failed.');
 }
 
 // ---- Provider-specific generation ----
@@ -533,19 +659,15 @@ Generate all necessary files for both frontend and backend. The frontend files s
 
 Return the result as a JSON object where each key is a file path and each value is the file content string.`;
 
-    let lastErr = null;
-
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      try {
-        const content = await callModel(modelId, SYSTEM_PROMPT, userPrompt);
-        const files = parseAndValidateFiles(content, prompt);
-        return files;
-      } catch (err) {
-        lastErr = err;
+    try {
+      return await generateWithModel(modelId, userPrompt, prompt);
+    } catch (primaryErr) {
+      // Fallback to default model if a non-default model repeatedly fails.
+      if (modelId !== DEFAULT_MODEL) {
+        return await generateWithModel(DEFAULT_MODEL, userPrompt, prompt);
       }
+      throw primaryErr;
     }
-
-    throw lastErr || new Error('Unknown generation failure.');
   } catch (err) {
     console.error('AI Generation error:', err);
     throw new Error('Failed to generate project: ' + err.message);
@@ -569,9 +691,14 @@ EDIT REQUEST: ${editPrompt}
 
 Apply the requested changes to the project. Return the COMPLETE updated project files as a JSON object (include ALL files, both modified and unmodified). Make sure frontend and backend remain properly connected.`;
 
-    const content = await callModel(modelId, SYSTEM_PROMPT, userPrompt);
-    const files = parseAndValidateFiles(content, originalPrompt);
-    return files;
+    try {
+      return await generateWithModel(modelId, userPrompt, originalPrompt);
+    } catch (primaryErr) {
+      if (modelId !== DEFAULT_MODEL) {
+        return await generateWithModel(DEFAULT_MODEL, userPrompt, originalPrompt);
+      }
+      throw primaryErr;
+    }
   } catch (err) {
     console.error('AI Edit error:', err);
     throw new Error('Failed to edit project: ' + err.message);

@@ -8,6 +8,8 @@ export default function LenisScroll() {
             smoothWheel: true,
             smoothTouch: false,
             anchors: true,
+            // Keep native scrolling inside nested containers like editors/dropdowns.
+            prevent: (node) => !!node.closest('[data-lenis-prevent]'),
         });
 
         const raf = (time) => {

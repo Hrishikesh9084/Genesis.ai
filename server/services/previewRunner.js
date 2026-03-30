@@ -107,6 +107,8 @@ const startPreview = async (projectId, files) => {
   }
 
   const projectDir = path.join(PREVIEWS_DIR, projectId);
+  let backendProc = null;
+  let frontendProc = null;
   updateStatus(projectId, 'starting', 'Writing project files...');
 
   try {
@@ -129,10 +131,10 @@ const startPreview = async (projectId, files) => {
 
     // Step 2: Install dependencies
     if (hasClient) {
-      await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], clientDir);
+      await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], clientDir);
     }
     if (hasServer) {
-      await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund'], serverDir);
+      await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], serverDir);
     }
 
     // Ensure preview proxy works even when generated client has no vite config.
@@ -159,54 +161,67 @@ export default defineConfig({
     updateStatus(projectId, 'starting', 'Starting servers...');
 
     // Step 3: Start backend
-    let backendProc = null;
     let backendLogs = '';
     if (hasServer) {
       const serverPkg = readPackageJson(serverDir);
-      const serverScript = getScriptCommand(serverPkg, ['dev', 'start']);
       const entry = ['index.js', 'server.js', 'app.js'].find(
         (f) => fs.existsSync(path.join(serverDir, f))
       ) || 'index.js';
 
-      const backendCommand = serverScript ? 'npm' : 'node';
-      const backendArgs = serverScript ? ['run', serverScript] : [entry];
+      const backendCandidates = [];
+      if (serverPkg?.scripts?.dev) backendCandidates.push({ command: 'npm', args: ['run', 'dev'], label: 'npm run dev' });
+      if (serverPkg?.scripts?.start) backendCandidates.push({ command: 'npm', args: ['run', 'start'], label: 'npm run start' });
+      if (backendCandidates.length === 0) {
+        backendCandidates.push({ command: 'node', args: [entry], label: `node ${entry}` });
+      }
 
-      backendProc = spawn(backendCommand, backendArgs, {
-        cwd: serverDir,
-        shell: true,
-        stdio: 'pipe',
-        env: {
-          ...process.env,
-          PORT: String(backendPort),
-          NODE_ENV: 'development',
-          DATABASE_URL: process.env.DATABASE_URL || '',
-        },
-      });
-      backendProc.stdout.on('data', (d) => {
-        const line = d.toString();
-        backendLogs += line;
-        if (backendLogs.length > 6000) backendLogs = backendLogs.slice(-6000);
-        console.log(`[preview:backend:${projectId}] ${line.trim()}`);
-      });
-      backendProc.stderr.on('data', (d) => {
-        const line = d.toString();
-        backendLogs += line;
-        if (backendLogs.length > 6000) backendLogs = backendLogs.slice(-6000);
-        console.log(`[preview:backend:${projectId}] ${line.trim()}`);
-      });
-      backendProc.on('exit', (code) => {
-        console.log(`[preview:backend:${projectId}] exited with code ${code}`);
-      });
+      let lastBackendError = null;
+      for (const candidate of backendCandidates) {
+        backendProc = spawn(candidate.command, candidate.args, {
+          cwd: serverDir,
+          shell: true,
+          stdio: 'pipe',
+          env: {
+            ...process.env,
+            PORT: String(backendPort),
+            NODE_ENV: 'development',
+            DATABASE_URL: process.env.DATABASE_URL || '',
+          },
+        });
 
-      try {
-        await waitForPort(backendPort, 60000);
-      } catch {
-        throw new Error(`Backend failed to start. ${backendLogs.trim() || 'No backend logs.'}`);
+        backendProc.stdout.on('data', (d) => {
+          const line = d.toString();
+          backendLogs += line;
+          if (backendLogs.length > 6000) backendLogs = backendLogs.slice(-6000);
+          console.log(`[preview:backend:${projectId}] ${line.trim()}`);
+        });
+        backendProc.stderr.on('data', (d) => {
+          const line = d.toString();
+          backendLogs += line;
+          if (backendLogs.length > 6000) backendLogs = backendLogs.slice(-6000);
+          console.log(`[preview:backend:${projectId}] ${line.trim()}`);
+        });
+        backendProc.on('exit', (code) => {
+          console.log(`[preview:backend:${projectId}] exited with code ${code}`);
+        });
+
+        try {
+          await waitForPort(backendPort, 45000);
+          lastBackendError = null;
+          break;
+        } catch {
+          lastBackendError = new Error(`Backend command '${candidate.label}' failed to open port ${backendPort}.`);
+          killProc(backendProc);
+          backendProc = null;
+        }
+      }
+
+      if (lastBackendError) {
+        throw new Error(`Backend failed to start. ${backendLogs.trim() || lastBackendError.message}`);
       }
     }
 
     // Step 4: Start frontend dev server
-    let frontendProc = null;
     let frontendLogs = '';
     if (hasClient) {
       const clientPkg = readPackageJson(clientDir);
@@ -269,6 +284,8 @@ export default defineConfig({
 
     return activePreviews.get(projectId);
   } catch (err) {
+    killProc(backendProc);
+    killProc(frontendProc);
     console.error(`[preview:${projectId}] Failed:`, err.message);
     updateStatus(projectId, 'error', err.message);
     throw err;

@@ -177,7 +177,7 @@ export default function NewProject() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label className="block text-sm font-medium text-gray-300 mb-1.5  ">
               Stack
             </label>
             <select
@@ -226,7 +226,10 @@ export default function NewProject() {
               </button>
 
               {isModelDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-gray-700 bg-gray-900 shadow-2xl z-30 max-h-72 overflow-y-auto">
+                <div
+                  data-lenis-prevent
+                  className="absolute top-full left-0 right-0 mt-2 rounded-xl border border-gray-700 bg-gray-900 shadow-2xl z-30 max-h-72 overflow-y-auto overscroll-contain"
+                >
                   {Object.entries(providers).map(([key, provider]) => (
                     <div key={key} className="p-2">
                       <p className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">
