@@ -4,31 +4,31 @@ import { useState } from 'react';
 import { motion } from "framer-motion";
 
 export default function FaqSection() {
-    const [isOpen, setIsOpen] = useState(false);
+    const [isOpen, setIsOpen] = useState(null);
     const data = [
         {
-            question: 'Do I need coding or design experience to use PrebuiltUI?',
-            answer: "Basic coding knowledge (HTML/CSS, Tailwind) helps, but advanced design skills aren't required. You can use components as-is or customize them.",
+            question: 'What is Genesis.ai and what can I build with it?',
+            answer: 'Genesis.ai helps you generate, edit, preview, and deploy full-stack projects from a prompt. You can build apps with a frontend and backend, then push code to GitHub and deploy to supported platforms.',
         },
         {
-            question: 'What is PrebuiltUI and how does it help developers and designers?',
-            answer: 'PrebuiltUI provides ready-to-use, customizable UI components and templates, saving time for developers and designers.',
+            question: 'Do I need coding experience to use Genesis.ai?',
+            answer: 'No, you can start with plain-language prompts. Basic coding knowledge helps when customizing generated files, but the platform is designed for both technical and non-technical users.',
         },
         {
-            question: 'Can I use PrebuiltUI components in my existing project?',
-            answer: 'Yes, components can be integrated into HTML, React, Next.js, Vue, and other projects using Tailwind CSS.',
+            question: 'Why do I need to accept Terms and Conditions on login/register?',
+            answer: 'Acceptance is required to continue. It confirms you agree to the platform rules, privacy practices, and acceptable-use requirements before creating or accessing an account.',
         },
         {
-            question: 'How customizable are the generated components?',
-            answer: 'Components are highly customizable with Tailwind utility classes, theming, and structural adjustments.',
+            question: 'Where can I read the Privacy Policy and Terms of Service?',
+            answer: 'You can open them any time from the footer or directly at /privacy-policy and /terms-of-service.',
         },
         {
-            question: 'Does PrebuiltUI support team collaboration?',
-            answer: "There's no clear documentation on built-in collaboration features. Check their support for team options.",
+            question: 'Can I connect GitHub and deploy my generated projects?',
+            answer: 'Yes. After generation, you can push your project to GitHub and deploy to supported providers. Deployment status and logs are available in the project flow.',
         },
         {
-            question: 'Can I try PrebuiltUI before purchasing a plan?',
-            answer: 'Yes, you can try PrebuiltUI with full access to features.',
+            question: 'Is AI-generated code production-ready?',
+            answer: 'Generated code can accelerate development, but you should always review, test, and secure it before production deployment.',
         },
     ];
 
