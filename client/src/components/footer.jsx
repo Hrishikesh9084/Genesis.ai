@@ -9,12 +9,6 @@ import Logo from "./Logo";
 import { Link } from "react-router-dom";
 
 export default function Footer() {
-  const links = [
-    { name: "Terms of Service", href: "#terms-of-service" },
-    { name: "Privacy Policy", href: "#privacy-policy" },
-    { name: "Security", href: "#security" },
-    { name: "Sitemap", href: "#sitemap" },
-  ];
   return (
     <motion.footer
       className="relative overflow-hidden px-6 md:px-16 lg:px-24 xl:px-32 w-full text-sm text-white bg-black/50  mt-24 pt-10"
@@ -85,9 +79,9 @@ export default function Footer() {
             <a className="hover:text-slate-600 transition" href="#">
               Contact us
             </a>
-            <a className="hover:text-slate-600 transition" href="#">
+            <Link className="hover:text-slate-600 transition" to="/privacy-policy" onClick={()=>scrollTo(0,0)}>
               Privacy policy
-            </a>
+            </Link>
           </div>
         </div>
         <div>
@@ -117,7 +111,7 @@ export default function Footer() {
           Copyright 2026 © <Link to="/">Genesis</Link> All Right Reserved.
         </p>
         <div className="flex items-center gap-4">
-          <Link to="/">Privacy Policy</Link>
+          <Link to="/privacy-policy" onClick={()=>scrollTo(0,0)}>Privacy Policy</Link>
           <Link to="/">Terms of Service</Link>
           <Link to="/">Cookie Policy</Link>
         </div>

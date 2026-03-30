@@ -19,6 +19,7 @@ const EditProject = lazy(() => import("./pages/EditProject"));
 const DeployProject = lazy(() => import("./pages/DeployProject"));
 const Settings = lazy(() => import("./pages/Settings"));
 const GithubCallback = lazy(() => import("./pages/GithubCallback"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function ProtectedRoute({ children }) {
@@ -107,6 +108,7 @@ export default function App() {
 
             {/* Public route - accessible by everyone */}
             <Route path="/plans" element={<PricingPlans />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
             {/* Protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
