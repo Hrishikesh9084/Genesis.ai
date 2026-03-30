@@ -208,6 +208,40 @@ function validateDeployIdParam(req, res, next) {
   next();
 }
 
+function validateContactSubmission(req, res, next) {
+  const { name, email, subject, message } = req.body || {};
+
+  if (!String(name || '').trim()) {
+    return badRequest(res, 'Name is required.');
+  }
+
+  if (!isValidEmail(email)) {
+    return badRequest(res, 'A valid email is required.');
+  }
+
+  if (!String(subject || '').trim()) {
+    return badRequest(res, 'Subject is required.');
+  }
+
+  if (String(subject).trim().length > 120) {
+    return badRequest(res, 'Subject must be 120 characters or fewer.');
+  }
+
+  if (!String(message || '').trim()) {
+    return badRequest(res, 'Message is required.');
+  }
+
+  if (String(message).trim().length < 10) {
+    return badRequest(res, 'Message must be at least 10 characters.');
+  }
+
+  if (String(message).trim().length > 5000) {
+    return badRequest(res, 'Message must be 5000 characters or fewer.');
+  }
+
+  next();
+}
+
 export default {
   validateRegister,
   validateLogin,
@@ -223,4 +257,5 @@ export default {
   validateUpdateProfile,
   validateDeployBody,
   validateDeployIdParam,
+  validateContactSubmission,
 };

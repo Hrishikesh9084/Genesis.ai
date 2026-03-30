@@ -1,5 +1,6 @@
 import { Mail, MapPin, Phone } from "lucide-react";
 import { useState } from "react";
+import api from "../services/api";
 
 const contactCards = [
   {
@@ -23,12 +24,39 @@ const contactCards = [
 ];
 
 export default function Contact() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [formValues, setFormValues] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
+  });
 
-  const handleSubmit = (event) => {
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setFormValues((prev) => ({ ...prev, [name]: value }));
+    if (submitted) setSubmitted(false);
+    if (errorMessage) setErrorMessage("");
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setSubmitted(true);
-    event.currentTarget.reset();
+
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      await api.post("/contact", formValues);
+      setSubmitted(true);
+      setFormValues({ name: "", email: "", subject: "", message: "" });
+    } catch (error) {
+      setSubmitted(false);
+      setErrorMessage(error.response?.data?.error || "Failed to send message. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -79,22 +107,53 @@ export default function Contact() {
 
             {submitted && (
               <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
-                Thanks for reaching out. Your message has been received.
+                Thanks for reaching out. Your message has been received, and we sent a confirmation email.
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                {errorMessage}
               </div>
             )}
 
             <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
               <div>
                 <label className="mb-1.5 block text-sm text-slate-300">Name</label>
-                <input className="input-field" type="text" name="name" placeholder="Your full name" required />
+                <input
+                  className="input-field"
+                  type="text"
+                  name="name"
+                  placeholder="Your full name"
+                  value={formValues.name}
+                  onChange={handleChange}
+                  required
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-slate-300">Email</label>
-                <input className="input-field" type="email" name="email" placeholder="you@company.com" required />
+                <input
+                  className="input-field"
+                  type="email"
+                  name="email"
+                  placeholder="you@company.com"
+                  value={formValues.email}
+                  onChange={handleChange}
+                  required
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-slate-300">Subject</label>
-                <input className="input-field" type="text" name="subject" placeholder="How can we help?" required />
+                <input
+                  className="input-field"
+                  type="text"
+                  name="subject"
+                  placeholder="How can we help?"
+                  value={formValues.subject}
+                  onChange={handleChange}
+                  maxLength={120}
+                  required
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm text-slate-300">Message</label>
@@ -102,11 +161,14 @@ export default function Contact() {
                   className="input-field min-h-32 resize-y"
                   name="message"
                   placeholder="Tell us about your use case"
+                  value={formValues.message}
+                  onChange={handleChange}
+                  maxLength={5000}
                   required
                 />
               </div>
-              <button type="submit" className="btn-primary w-full rounded-xl">
-                Send Message
+              <button type="submit" className="btn-primary w-full rounded-xl" disabled={isSubmitting}>
+                {isSubmitting ? "Sending..." : "Send Message"}
               </button>
             </form>
           </div>
