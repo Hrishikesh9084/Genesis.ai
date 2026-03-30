@@ -136,7 +136,7 @@ export default function Contact() {
                   className="input-field"
                   type="email"
                   name="email"
-                  placeholder="you@company.com"
+                  placeholder="Enter your email address"
                   value={formValues.email}
                   onChange={handleChange}
                   required
