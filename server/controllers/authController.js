@@ -178,6 +178,23 @@ function resolveServerBaseUrl(req) {
   return `${protocol}://${host}`;
 }
 
+function getAdminEmailSet() {
+  const emails = String(process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return new Set(emails);
+}
+
+function withAdminFlag(user) {
+  if (!user || typeof user !== 'object') return user;
+
+  const email = String(user.email || '').trim().toLowerCase();
+  const isAdmin = email ? getAdminEmailSet().has(email) : false;
+  return { ...user, is_admin: isAdmin };
+}
+
 function buildEmailVerificationToken(user) {
   const secret = `${process.env.JWT_SECRET}${user.password}`;
   return jwt.sign({ id: user.id, email: user.email, purpose: 'email_verification' }, secret, {
@@ -235,7 +252,7 @@ const register = async (req, res, next) => {
 
     const { password: _, ...userWithoutPassword } = user;
     res.status(201).json({
-      user: userWithoutPassword,
+      user: withAdminFlag(userWithoutPassword),
       requiresEmailVerification: true,
       message: 'Registration successful. Please verify your email before logging in.',
     });
@@ -273,7 +290,7 @@ const login = async (req, res, next) => {
     const token = generateToken(user);
     const { password: _, ...userWithoutPassword } = user;
 
-    res.json({ user: userWithoutPassword, token });
+    res.json({ user: withAdminFlag(userWithoutPassword), token });
   } catch (err) {
     next(err);
   }
@@ -292,7 +309,7 @@ const getMe = async (req, res, next) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    res.json({ user: result.rows[0] });
+    res.json({ user: withAdminFlag(result.rows[0]) });
   } catch (err) {
     next(err);
   }
@@ -330,7 +347,7 @@ const updateProfile = async (req, res, next) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    res.json({ user: result.rows[0] });
+    res.json({ user: withAdminFlag(result.rows[0]) });
   } catch (err) {
     next(err);
   }
@@ -360,7 +377,7 @@ const uploadProfileImage = async (req, res, next) => {
 
     return res.json({
       message: 'Profile image uploaded successfully.',
-      user: result.rows[0],
+      user: withAdminFlag(result.rows[0]),
     });
   } catch (err) {
     next(err);

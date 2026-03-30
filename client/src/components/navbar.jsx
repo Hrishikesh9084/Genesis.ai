@@ -57,11 +57,10 @@ export default function Navbar() {
     { name: "Contact", href: "/contact" },
   ];
 
-  const adminEmails = String(import.meta.env.VITE_ADMIN_EMAILS || "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  const isAdminUser = Boolean(user?.email) && adminEmails.includes(String(user.email).toLowerCase());
+  const isAdminUser =
+    user?.is_admin === true ||
+    String(user?.is_admin || "").toLowerCase() === "true" ||
+    String(user?.role || "").toLowerCase() === "admin";
 
   const authLinks = [
     { name: "Dashboard", href: "/dashboard" },
