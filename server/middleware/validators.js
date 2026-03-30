@@ -364,6 +364,71 @@ function validateApplicationStatusLookup(req, res, next) {
   next();
 }
 
+function validateAdminCreateJobRole(req, res, next) {
+  const {
+    id,
+    title,
+    department,
+    location,
+    type,
+    summary,
+    requirements,
+    isActive,
+  } = req.body || {};
+
+  if (id !== undefined && !String(id).trim()) {
+    return badRequest(res, 'id cannot be empty.');
+  }
+
+  if (!String(title || '').trim()) {
+    return badRequest(res, 'title is required.');
+  }
+
+  if (!String(department || '').trim()) {
+    return badRequest(res, 'department is required.');
+  }
+
+  if (!String(location || '').trim()) {
+    return badRequest(res, 'location is required.');
+  }
+
+  if (!String(type || '').trim()) {
+    return badRequest(res, 'type is required.');
+  }
+
+  if (!String(summary || '').trim()) {
+    return badRequest(res, 'summary is required.');
+  }
+
+  if (String(summary).trim().length > 1200) {
+    return badRequest(res, 'summary must be 1200 characters or fewer.');
+  }
+
+  if (!Array.isArray(requirements) || requirements.length === 0) {
+    return badRequest(res, 'requirements must be a non-empty array.');
+  }
+
+  if (requirements.length > 20) {
+    return badRequest(res, 'requirements must have at most 20 items.');
+  }
+
+  for (const requirement of requirements) {
+    if (!String(requirement || '').trim()) {
+      return badRequest(res, 'requirements must contain non-empty strings.');
+    }
+
+    if (String(requirement).trim().length > 300) {
+      return badRequest(res, 'each requirement must be 300 characters or fewer.');
+    }
+  }
+
+  if (isActive !== undefined && typeof isActive !== 'boolean') {
+    return badRequest(res, 'isActive must be a boolean when provided.');
+  }
+
+  next();
+}
+
 export default {
   validateRegister,
   validateLogin,
@@ -384,4 +449,5 @@ export default {
   validateApplicationIdParam,
   validateApplicationStatusUpdate,
   validateApplicationStatusLookup,
+  validateAdminCreateJobRole,
 };

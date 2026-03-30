@@ -29,6 +29,8 @@ router.post('/apply', applyLimiter, upload.uploadResumeFile, validators.validate
 router.post('/status', statusLookupLimiter, validators.validateApplicationStatusLookup, careersController.getApplicationStatus);
 
 router.use('/admin', authenticate, requireAdmin);
+router.get('/admin/jobs', careersController.listJobRoles);
+router.post('/admin/jobs', validators.validateAdminCreateJobRole, careersController.createJobRole);
 router.get('/admin/applications', careersController.listApplications);
 router.patch(
 	'/admin/applications/:id/status',

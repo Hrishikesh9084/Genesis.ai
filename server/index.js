@@ -3,8 +3,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import db from './config/db.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import deployRoutes from './routes/deploy.js';
@@ -17,6 +19,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const REQUEST_TIMEOUT_MS = Number.parseInt(String(process.env.REQUEST_TIMEOUT_MS || '30000'), 10);
 
 // Required when running behind a reverse proxy (Vercel/Render/Nginx) so req.ip is derived correctly.
 app.set('trust proxy', 1);
@@ -28,7 +31,15 @@ app.use(helmet({
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
 }));
-app.use(express.json({ limit: '50mb' }));
+app.use(compression());
+app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.REQUEST_BODY_LIMIT || '2mb' }));
+
+app.use((req, res, next) => {
+  req.setTimeout(REQUEST_TIMEOUT_MS);
+  res.setTimeout(REQUEST_TIMEOUT_MS);
+  next();
+});
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -65,8 +76,25 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Genesis.ai server running on port ${PORT}`);
 });
+
+async function shutdown(signal) {
+  console.log(`Received ${signal}. Starting graceful shutdown...`);
+  server.close(async () => {
+    try {
+      await db.pool.end();
+      console.log('Database pool closed.');
+      process.exit(0);
+    } catch (err) {
+      console.error('Failed to close database pool cleanly:', err);
+      process.exit(1);
+    }
+  });
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default app;

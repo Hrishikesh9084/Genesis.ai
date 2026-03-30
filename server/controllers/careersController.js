@@ -7,8 +7,14 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const resumesBaseDir = path.join(__dirname, '../uploads/resumes');
+let ensureJobRolesPromise;
+let jobsCache = {
+  expiresAt: 0,
+  value: null,
+};
+const JOBS_CACHE_TTL_MS = Number.parseInt(String(process.env.JOBS_CACHE_TTL_MS || '30000'), 10);
 
-const careersJobs = [
+const defaultCareersJobs = [
   {
     id: 'senior-frontend-engineer',
     title: 'Senior Frontend Engineer',
@@ -49,6 +55,132 @@ const careersJobs = [
     ],
   },
 ];
+
+function normalizeRoleRequirements(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+}
+
+function sanitizeRoleRecord(record) {
+  if (!record) return null;
+
+  return {
+    id: String(record.id || '').trim(),
+    title: String(record.title || '').trim(),
+    department: String(record.department || '').trim(),
+    location: String(record.location || '').trim(),
+    type: String(record.type || '').trim(),
+    summary: String(record.summary || '').trim(),
+    requirements: normalizeRoleRequirements(record.requirements),
+    isActive: Boolean(record.is_active),
+    createdAt: record.created_at || null,
+    updatedAt: record.updated_at || null,
+  };
+}
+
+async function ensureJobRolesTable() {
+  if (!ensureJobRolesPromise) {
+    ensureJobRolesPromise = (async () => {
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS job_roles (
+          id VARCHAR(120) PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          department VARCHAR(120) NOT NULL,
+          location VARCHAR(255) NOT NULL,
+          type VARCHAR(80) NOT NULL,
+          summary TEXT NOT NULL,
+          requirements JSONB NOT NULL DEFAULT '[]'::jsonb,
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_job_roles_is_active ON job_roles(is_active);
+      `);
+
+      const countResult = await db.query('SELECT COUNT(*)::int AS total FROM job_roles');
+      const total = Number(countResult.rows[0]?.total || 0);
+      if (total > 0) return;
+
+      for (const role of defaultCareersJobs) {
+        await db.query(
+          `INSERT INTO job_roles (id, title, department, location, type, summary, requirements, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, TRUE)
+           ON CONFLICT (id) DO NOTHING`,
+          [
+            role.id,
+            role.title,
+            role.department,
+            role.location,
+            role.type,
+            role.summary,
+            JSON.stringify(role.requirements || []),
+          ]
+        );
+      }
+    })().catch((err) => {
+      ensureJobRolesPromise = null;
+      throw err;
+    });
+  }
+
+  return ensureJobRolesPromise;
+}
+
+async function getJobRoles({ includeInactive = false } = {}) {
+  await ensureJobRolesTable();
+
+  const rowsResult = await db.query(
+    `SELECT
+       id,
+       title,
+       department,
+       location,
+       type,
+       summary,
+       requirements,
+       is_active,
+       created_at,
+       updated_at
+     FROM job_roles
+     ${includeInactive ? '' : 'WHERE is_active = TRUE'}
+     ORDER BY created_at DESC`
+  );
+
+  return rowsResult.rows.map(sanitizeRoleRecord).filter(Boolean);
+}
+
+function readJobsCache() {
+  if (!jobsCache.value) return null;
+  if (Date.now() >= jobsCache.expiresAt) return null;
+  return jobsCache.value;
+}
+
+function writeJobsCache(jobs) {
+  if (!Array.isArray(jobs)) return;
+  jobsCache = {
+    value: jobs,
+    expiresAt: Date.now() + Math.max(5000, JOBS_CACHE_TTL_MS),
+  };
+}
+
+function invalidateJobsCache() {
+  jobsCache = {
+    value: null,
+    expiresAt: 0,
+  };
+}
+
+function slugifyRoleId(value) {
+  return String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 120);
+}
 
 function escapeHtml(value) {
   return String(value || '')
@@ -114,7 +246,14 @@ async function verifyHCaptchaToken({ token, remoteIp }) {
 
 const getJobs = async (_req, res, next) => {
   try {
-    res.json({ jobs: careersJobs });
+    const cached = readJobsCache();
+    if (cached) {
+      return res.json({ jobs: cached, cache: 'hit' });
+    }
+
+    const jobs = await getJobRoles();
+    writeJobsCache(jobs);
+    res.json({ jobs, cache: 'miss' });
   } catch (err) {
     next(err);
   }
@@ -156,8 +295,28 @@ const applyForJob = async (req, res, next) => {
     const resumeMimeType = req.file?.mimetype || null;
     const resumeSize = req.file?.size || null;
 
-    const matchedRole = careersJobs.find((job) => job.id === roleId);
-    const roleTitle = matchedRole?.title || 'General Application';
+    await ensureJobRolesTable();
+
+    const roleResult = await db.query(
+      `SELECT id, title
+       FROM job_roles
+       WHERE id = $1 AND is_active = TRUE
+       LIMIT 1`,
+      [roleId]
+    );
+
+    if (roleResult.rows.length === 0) {
+      if (req.file?.path) {
+        try {
+          await fs.promises.unlink(req.file.path);
+        } catch (_unlinkErr) {
+          // Ignore cleanup failure in invalid role path.
+        }
+      }
+      return res.status(400).json({ error: 'Selected role is not available.' });
+    }
+
+    const roleTitle = String(roleResult.rows[0].title || 'General Application');
 
     const insertResult = await db.query(
       `INSERT INTO job_applications (
@@ -304,6 +463,8 @@ const applyForJob = async (req, res, next) => {
 
 const listApplications = async (req, res, next) => {
   try {
+    await ensureJobRolesTable();
+
     const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
     const pageSizeRaw = Number.parseInt(String(req.query.pageSize || '20'), 10) || 20;
     const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
@@ -446,6 +607,67 @@ const updateApplicationStatus = async (req, res, next) => {
   }
 };
 
+const listJobRoles = async (_req, res, next) => {
+  try {
+    const roles = await getJobRoles({ includeInactive: true });
+    return res.json({ roles });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const createJobRole = async (req, res, next) => {
+  try {
+    await ensureJobRolesTable();
+
+    const title = String(req.body?.title || '').trim();
+    const department = String(req.body?.department || '').trim();
+    const location = String(req.body?.location || '').trim();
+    const type = String(req.body?.type || '').trim();
+    const summary = String(req.body?.summary || '').trim();
+    const requirements = normalizeRoleRequirements(req.body?.requirements);
+    const isActive = req.body?.isActive === undefined ? true : Boolean(req.body?.isActive);
+
+    let roleId = String(req.body?.id || '').trim();
+    if (!roleId) {
+      roleId = slugifyRoleId(title);
+    }
+
+    if (!roleId) {
+      return res.status(400).json({ error: 'Unable to generate role id. Provide a valid id or title.' });
+    }
+
+    const insertResult = await db.query(
+      `INSERT INTO job_roles (id, title, department, location, type, summary, requirements, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+       RETURNING
+         id,
+         title,
+         department,
+         location,
+         type,
+         summary,
+         requirements,
+         is_active,
+         created_at,
+         updated_at`,
+      [roleId, title, department, location, type, summary, JSON.stringify(requirements), isActive]
+    );
+
+    invalidateJobsCache();
+
+    return res.status(201).json({
+      role: sanitizeRoleRecord(insertResult.rows[0]),
+      message: 'Job role created successfully.',
+    });
+  } catch (err) {
+    if (err?.code === '23505') {
+      return res.status(409).json({ error: 'A job role with this id already exists.' });
+    }
+    return next(err);
+  }
+};
+
 const downloadApplicationResume = async (req, res, next) => {
   try {
     const result = await db.query(
@@ -488,6 +710,8 @@ const downloadApplicationResume = async (req, res, next) => {
 export default {
   getJobs,
   applyForJob,
+  listJobRoles,
+  createJobRole,
   listApplications,
   getApplicationStatus,
   updateApplicationStatus,

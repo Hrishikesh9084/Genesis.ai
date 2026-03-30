@@ -14,10 +14,14 @@ function normalizeFileName(value) {
 
 export default function AdminApplications() {
   const [applications, setApplications] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, page: 1, pageSize: 20, totalPages: 1 });
   const [statuses, setStatuses] = useState(["new", "reviewing", "shortlisted", "rejected", "hired", "archived"]);
   const [loading, setLoading] = useState(true);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [creatingRole, setCreatingRole] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [roleMessage, setRoleMessage] = useState("");
   const [updatingId, setUpdatingId] = useState("");
 
   const [filters, setFilters] = useState({
@@ -28,15 +32,33 @@ export default function AdminApplications() {
     pageSize: 20,
   });
 
-  const roleOptions = useMemo(() => {
-    const map = new Map();
-    applications.forEach((item) => {
-      if (item.role_id && item.role_title) {
-        map.set(item.role_id, item.role_title);
-      }
-    });
-    return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
-  }, [applications]);
+  const [roleForm, setRoleForm] = useState({
+    id: "",
+    title: "",
+    department: "",
+    location: "",
+    type: "Full-time",
+    summary: "",
+    requirementsText: "",
+    isActive: true,
+  });
+
+  const roleOptions = useMemo(
+    () => roles.map((role) => ({ id: role.id, title: role.title })),
+    [roles]
+  );
+
+  const loadRoles = async () => {
+    setRolesLoading(true);
+    try {
+      const response = await api.get("/careers/admin/jobs");
+      setRoles(response.data?.roles || []);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || "Unable to load job roles.");
+    } finally {
+      setRolesLoading(false);
+    }
+  };
 
   const loadApplications = async () => {
     setLoading(true);
@@ -69,6 +91,10 @@ export default function AdminApplications() {
     loadApplications();
   }, [filters.page, filters.pageSize, filters.status, filters.roleId, filters.q]);
 
+  useEffect(() => {
+    loadRoles();
+  }, []);
+
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setFilters((prev) => ({ ...prev, [name]: value, page: 1 }));
@@ -88,6 +114,59 @@ export default function AdminApplications() {
       setErrorMessage(err.response?.data?.error || "Failed to update application status.");
     } finally {
       setUpdatingId("");
+    }
+  };
+
+  const handleRoleFormChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setRoleForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+    if (roleMessage) setRoleMessage("");
+    if (errorMessage) setErrorMessage("");
+  };
+
+  const handleCreateRole = async (event) => {
+    event.preventDefault();
+    setCreatingRole(true);
+    setRoleMessage("");
+    setErrorMessage("");
+
+    try {
+      const requirements = roleForm.requirementsText
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      const payload = {
+        id: roleForm.id.trim() || undefined,
+        title: roleForm.title.trim(),
+        department: roleForm.department.trim(),
+        location: roleForm.location.trim(),
+        type: roleForm.type.trim(),
+        summary: roleForm.summary.trim(),
+        requirements,
+        isActive: roleForm.isActive,
+      };
+
+      await api.post("/careers/admin/jobs", payload);
+      setRoleMessage("Job role added successfully.");
+      setRoleForm({
+        id: "",
+        title: "",
+        department: "",
+        location: "",
+        type: "Full-time",
+        summary: "",
+        requirementsText: "",
+        isActive: true,
+      });
+      await loadRoles();
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || "Failed to add job role.");
+    } finally {
+      setCreatingRole(false);
     }
   };
 
@@ -120,6 +199,65 @@ export default function AdminApplications() {
         <p className="mt-3 text-sm leading-7 text-slate-300">
           Review candidate applications, filter by status/role, update hiring stage, and download uploaded resumes.
         </p>
+
+        <div className="mt-6 rounded-xl border border-white/10 bg-white/3 p-4 sm:p-5">
+          <h2 className="text-lg font-semibold text-white">Add Job Role</h2>
+          <p className="mt-1 text-sm text-slate-300">Create a new careers role visible on public openings and application form.</p>
+
+          {roleMessage && (
+            <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+              {roleMessage}
+            </div>
+          )}
+
+          <form className="mt-4 space-y-3" onSubmit={handleCreateRole}>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <input className="input-field" name="title" value={roleForm.title} onChange={handleRoleFormChange} placeholder="Role title" required />
+              <input className="input-field" name="department" value={roleForm.department} onChange={handleRoleFormChange} placeholder="Department" required />
+              <input className="input-field" name="location" value={roleForm.location} onChange={handleRoleFormChange} placeholder="Location" required />
+              <input className="input-field" name="type" value={roleForm.type} onChange={handleRoleFormChange} placeholder="Employment type" required />
+              <input className="input-field" name="id" value={roleForm.id} onChange={handleRoleFormChange} placeholder="Role ID (optional)" />
+              <label className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-300">
+                <input type="checkbox" name="isActive" checked={roleForm.isActive} onChange={handleRoleFormChange} />
+                Active
+              </label>
+            </div>
+
+            <textarea
+              className="input-field min-h-24 resize-y"
+              name="summary"
+              value={roleForm.summary}
+              onChange={handleRoleFormChange}
+              placeholder="Role summary"
+              required
+            />
+            <textarea
+              className="input-field min-h-28 resize-y"
+              name="requirementsText"
+              value={roleForm.requirementsText}
+              onChange={handleRoleFormChange}
+              placeholder="Requirements (one per line)"
+              required
+            />
+
+            <button type="submit" className="btn-primary rounded-lg px-4 py-2" disabled={creatingRole}>
+              {creatingRole ? "Adding role..." : "Add Role"}
+            </button>
+          </form>
+
+          <div className="mt-5">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Existing Roles</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {rolesLoading && <span className="text-sm text-slate-400">Loading roles...</span>}
+              {!rolesLoading && roleOptions.length === 0 && <span className="text-sm text-slate-400">No roles found.</span>}
+              {!rolesLoading && roleOptions.map((role) => (
+                <span key={role.id} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-300">
+                  {role.title}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
 
         {errorMessage && (
           <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">

@@ -8,13 +8,25 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
+function toInt(value, fallback) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: toInt(process.env.DB_POOL_MAX, 40),
+  min: toInt(process.env.DB_POOL_MIN, 5),
+  idleTimeoutMillis: toInt(process.env.DB_IDLE_TIMEOUT_MS, 30000),
+  connectionTimeoutMillis: toInt(process.env.DB_CONNECTION_TIMEOUT_MS, 5000),
+  query_timeout: toInt(process.env.DB_QUERY_TIMEOUT_MS, 15000),
+  statement_timeout: toInt(process.env.DB_STATEMENT_TIMEOUT_MS, 20000),
+  keepAlive: true,
+  keepAliveInitialDelayMillis: toInt(process.env.DB_KEEPALIVE_INITIAL_DELAY_MS, 10000),
 });
 
 pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
-  process.exit(-1);
 });
 
 const schemaReady = pool

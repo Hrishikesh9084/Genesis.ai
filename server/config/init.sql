@@ -78,9 +78,23 @@ CREATE TABLE IF NOT EXISTS job_applications (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS job_roles (
+  id VARCHAR(120) PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  department VARCHAR(120) NOT NULL,
+  location VARCHAR(255) NOT NULL,
+  type VARCHAR(80) NOT NULL,
+  summary TEXT NOT NULL,
+  requirements JSONB NOT NULL DEFAULT '[]'::jsonb,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_deployments_project_id ON deployments(project_id);
 CREATE INDEX IF NOT EXISTS idx_job_applications_email ON job_applications(email);
 CREATE INDEX IF NOT EXISTS idx_job_applications_role_id ON job_applications(role_id);
 CREATE INDEX IF NOT EXISTS idx_job_applications_status ON job_applications(status);
 CREATE INDEX IF NOT EXISTS idx_job_applications_created_at ON job_applications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_job_roles_is_active ON job_roles(is_active);
