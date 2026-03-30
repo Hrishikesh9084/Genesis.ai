@@ -62,9 +62,7 @@ export default function Footer() {
             />
           </Link>
           <p className="text-sm/7 mt-6">
-            PrebuiltUI is a free and open-source UI component library with over
-            340+ beautifully crafted, customizable components built with
-            Tailwind CSS.
+            Genesis is an all-in-one platform that empowers you to create, deploy, and interact with AI agents. Whether you're a developer, entrepreneur, or AI enthusiast, Genesis provides the tools and infrastructure to bring your AI ideas to life. 
           </p>
         </div>
         <div className="flex flex-col lg:items-center lg:justify-center">
