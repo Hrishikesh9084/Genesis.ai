@@ -1,3 +1,5 @@
+import fs from 'fs';
+
 function badRequest(res, error) {
   return res.status(400).json({ error });
 }
@@ -242,6 +244,126 @@ function validateContactSubmission(req, res, next) {
   next();
 }
 
+function isValidHttpUrl(value) {
+  if (!value) return true;
+  try {
+    const url = new URL(String(value).trim());
+    return ['http:', 'https:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function validateCareerApplication(req, res, next) {
+  const {
+    roleId,
+    fullName,
+    email,
+    phone,
+    yearsExperience,
+    linkedinUrl,
+    portfolioUrl,
+    coverLetter,
+    hcaptchaToken,
+  } = req.body || {};
+
+  const fail = (message) => {
+    if (req.file?.path) {
+      fs.promises.unlink(req.file.path).catch(() => {
+        // Ignore cleanup failure for validation errors.
+      });
+    }
+    return badRequest(res, message);
+  };
+
+  if (!String(roleId || '').trim()) {
+    return fail('roleId is required.');
+  }
+
+  if (!String(fullName || '').trim()) {
+    return fail('fullName is required.');
+  }
+
+  if (!isValidEmail(email)) {
+    return fail('A valid email is required.');
+  }
+
+  if (!req.file) {
+    return fail('Resume file is required.');
+  }
+
+  if (phone && String(phone).trim().length > 50) {
+    return fail('phone must be 50 characters or fewer.');
+  }
+
+  if (yearsExperience !== undefined && yearsExperience !== null && String(yearsExperience).trim() !== '') {
+    const parsed = Number.parseInt(String(yearsExperience), 10);
+    if (Number.isNaN(parsed) || parsed < 0 || parsed > 60) {
+      return fail('yearsExperience must be a number between 0 and 60.');
+    }
+  }
+
+  if (!isValidHttpUrl(linkedinUrl)) {
+    return fail('linkedinUrl must be a valid http/https URL.');
+  }
+
+  if (!isValidHttpUrl(portfolioUrl)) {
+    return fail('portfolioUrl must be a valid http/https URL.');
+  }
+
+  if (!String(coverLetter || '').trim()) {
+    return fail('coverLetter is required.');
+  }
+
+  if (String(coverLetter).trim().length < 50) {
+    return fail('coverLetter must be at least 50 characters.');
+  }
+
+  if (String(coverLetter).trim().length > 5000) {
+    return fail('coverLetter must be 5000 characters or fewer.');
+  }
+
+  if (hcaptchaToken !== undefined && String(hcaptchaToken).trim().length > 4000) {
+    return fail('hcaptchaToken is invalid.');
+  }
+
+  next();
+}
+
+function validateApplicationIdParam(req, res, next) {
+  if (!isUuid(req.params.id)) {
+    return badRequest(res, 'Application id must be a valid UUID.');
+  }
+
+  next();
+}
+
+function validateApplicationStatusUpdate(req, res, next) {
+  const status = String(req.body?.status || '').trim().toLowerCase();
+  const allowedStatuses = new Set(['new', 'reviewing', 'shortlisted', 'rejected', 'hired', 'archived']);
+
+  if (!allowedStatuses.has(status)) {
+    return badRequest(res, 'status must be one of: new, reviewing, shortlisted, rejected, hired, archived.');
+  }
+
+  next();
+}
+
+function validateApplicationStatusLookup(req, res, next) {
+  const applicationId = String(req.body?.applicationId || '').trim();
+  const email = String(req.body?.email || '').trim();
+
+  if (!isUuid(applicationId)) {
+    return badRequest(res, 'applicationId must be a valid UUID.');
+  }
+
+  if (!isValidEmail(email)) {
+    return badRequest(res, 'A valid email is required.');
+  }
+
+  next();
+}
+
 export default {
   validateRegister,
   validateLogin,
@@ -258,4 +380,8 @@ export default {
   validateDeployBody,
   validateDeployIdParam,
   validateContactSubmission,
+  validateCareerApplication,
+  validateApplicationIdParam,
+  validateApplicationStatusUpdate,
+  validateApplicationStatusLookup,
 };

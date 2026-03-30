@@ -53,13 +53,21 @@ export default function Navbar() {
     { name: "Home", href: "/" },
     { name: "Pricing", href: "/plans" },
     { name: "About", href: "/about" },
+    { name: "Careers", href: "/careers" },
     { name: "Contact", href: "/contact" },
   ];
+
+  const adminEmails = String(import.meta.env.VITE_ADMIN_EMAILS || "")
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const isAdminUser = Boolean(user?.email) && adminEmails.includes(String(user.email).toLowerCase());
 
   const authLinks = [
     { name: "Dashboard", href: "/dashboard" },
     { name: "New Project", href: "/new-project" },
     { name: "Settings", href: "/settings" },
+    ...(isAdminUser ? [{ name: "Admin", href: "/admin/applications" }] : []),
   ];
 
   const links = user ? [...publicLinks, ...authLinks] : publicLinks;

@@ -10,6 +10,7 @@ import projectRoutes from './routes/projects.js';
 import deployRoutes from './routes/deploy.js';
 import previewRoutes from './routes/preview.js';
 import contactRoutes from './routes/contact.js';
+import careersRoutes from './routes/careers.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,13 +46,14 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Genesis.ai API is running' });
 });
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/deploy', deployRoutes);
 app.use('/api/preview', previewRoutes);
 app.use('/api/contact', contactRoutes);
+app.use('/api/careers', careersRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));

@@ -71,9 +71,9 @@ export default function Footer() {
             <Link className="hover:text-orange-600 transition" to="/about" onClick={()=>scrollTo(0,0)}>
               About us
             </Link>
-            <a className="hover:text-orange-600 transition" href="#">
+            <Link className="hover:text-orange-600 transition" to="/careers" onClick={()=>scrollTo(0,0)}>
               Careers
-            </a>
+            </Link>
             <Link className="hover:text-orange-600 transition" to="/contact" onClick={()=>scrollTo(0,0)}>
               Contact us
             </Link>

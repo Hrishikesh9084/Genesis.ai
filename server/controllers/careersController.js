@@ -1,0 +1,495 @@
+import db from '../config/db.js';
+import emailService from '../services/emailService.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const resumesBaseDir = path.join(__dirname, '../uploads/resumes');
+
+const careersJobs = [
+  {
+    id: 'senior-frontend-engineer',
+    title: 'Senior Frontend Engineer',
+    department: 'Engineering',
+    location: 'Remote - India',
+    type: 'Full-time',
+    summary: 'Build fast, polished product experiences across Genesis.ai web surfaces.',
+    requirements: [
+      '4+ years building React products in production',
+      'Strong understanding of performance and accessibility',
+      'Experience with design systems and complex state management',
+    ],
+  },
+  {
+    id: 'backend-platform-engineer',
+    title: 'Backend Platform Engineer',
+    department: 'Engineering',
+    location: 'Remote - India',
+    type: 'Full-time',
+    summary: 'Design resilient backend APIs and platform services for project generation and deployments.',
+    requirements: [
+      '3+ years with Node.js and PostgreSQL',
+      'Experience with API security, rate limiting, and observability',
+      'Strong understanding of distributed systems fundamentals',
+    ],
+  },
+  {
+    id: 'developer-relations-lead',
+    title: 'Developer Relations Lead',
+    department: 'Growth',
+    location: 'Remote - Global',
+    type: 'Full-time',
+    summary: 'Help developers succeed with Genesis.ai through content, demos, and community programs.',
+    requirements: [
+      'Experience in technical writing, demos, and developer advocacy',
+      'Strong communication and product storytelling skills',
+      'Comfort collaborating with product and engineering teams',
+    ],
+  },
+];
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function resolveCareersInbox() {
+  return (
+    process.env.CAREERS_INBOX_EMAIL ||
+    process.env.CONTACT_INBOX_EMAIL ||
+    process.env.SMTP_USER ||
+    process.env.SMTP_FROM
+  );
+}
+
+function getAllowedStatuses() {
+  return ['new', 'reviewing', 'shortlisted', 'rejected', 'hired', 'archived'];
+}
+
+async function verifyHCaptchaToken({ token, remoteIp }) {
+  const secret = String(process.env.HCAPTCHA_SECRET || '').trim();
+
+  if (!secret) {
+    return {
+      success: String(process.env.NODE_ENV || '').toLowerCase() !== 'production',
+      reason: 'hCaptcha secret not configured',
+    };
+  }
+
+  if (!String(token || '').trim()) {
+    return { success: false, reason: 'hCaptcha token is missing' };
+  }
+
+  const body = new URLSearchParams({
+    secret,
+    response: String(token),
+  });
+
+  if (remoteIp) {
+    body.set('remoteip', String(remoteIp));
+  }
+
+  const response = await fetch('https://hcaptcha.com/siteverify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+
+  if (!response.ok) {
+    return { success: false, reason: 'hCaptcha verification request failed' };
+  }
+
+  const result = await response.json();
+  return {
+    success: Boolean(result?.success),
+    reason: Array.isArray(result?.['error-codes']) ? result['error-codes'].join(', ') : '',
+  };
+}
+
+const getJobs = async (_req, res, next) => {
+  try {
+    res.json({ jobs: careersJobs });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const applyForJob = async (req, res, next) => {
+  try {
+    const captchaCheck = await verifyHCaptchaToken({
+      token: req.body?.hcaptchaToken,
+      remoteIp: req.ip,
+    });
+
+    if (!captchaCheck.success) {
+      if (req.file?.path) {
+        try {
+          await fs.promises.unlink(req.file.path);
+        } catch (_unlinkErr) {
+          // Ignore cleanup failure in captcha reject path.
+        }
+      }
+      return res.status(400).json({ error: 'hCaptcha verification failed. Please try again.' });
+    }
+
+    const roleId = String(req.body?.roleId || '').trim();
+    const fullName = String(req.body?.fullName || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const phone = String(req.body?.phone || '').trim();
+    const location = String(req.body?.location || '').trim();
+    const yearsExperienceRaw = req.body?.yearsExperience;
+    const yearsExperience =
+      yearsExperienceRaw === undefined || yearsExperienceRaw === null || String(yearsExperienceRaw).trim() === ''
+        ? null
+        : Number.parseInt(String(yearsExperienceRaw), 10);
+    const linkedinUrl = String(req.body?.linkedinUrl || '').trim();
+    const portfolioUrl = String(req.body?.portfolioUrl || '').trim();
+    const coverLetter = String(req.body?.coverLetter || '').trim();
+    const resumeFilePath = req.file?.path ? path.resolve(req.file.path) : null;
+    const resumeOriginalName = req.file?.originalname || null;
+    const resumeMimeType = req.file?.mimetype || null;
+    const resumeSize = req.file?.size || null;
+
+    const matchedRole = careersJobs.find((job) => job.id === roleId);
+    const roleTitle = matchedRole?.title || 'General Application';
+
+    const insertResult = await db.query(
+      `INSERT INTO job_applications (
+         role_id,
+         role_title,
+         full_name,
+         email,
+         phone,
+         location,
+         years_experience,
+         linkedin_url,
+         portfolio_url,
+         resume_file_path,
+         resume_original_name,
+         resume_mime_type,
+         resume_size,
+         cover_letter,
+         source,
+         meta
+       ) VALUES (
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+       )
+       RETURNING id, created_at`,
+      [
+        roleId,
+        roleTitle,
+        fullName,
+        email,
+        phone || null,
+        location || null,
+        Number.isNaN(yearsExperience) ? null : yearsExperience,
+        linkedinUrl || null,
+        portfolioUrl || null,
+        resumeFilePath,
+        resumeOriginalName,
+        resumeMimeType,
+        resumeSize,
+        coverLetter,
+        'website',
+        JSON.stringify({
+          ip: req.ip,
+          userAgent: req.get('user-agent') || null,
+        }),
+      ]
+    );
+
+    const applicationId = insertResult.rows[0].id;
+
+    if (emailService.isEmailConfigured()) {
+      const inbox = resolveCareersInbox();
+      const safeName = escapeHtml(fullName);
+      const safeEmail = escapeHtml(email);
+      const safeRole = escapeHtml(roleTitle);
+      const safePhone = escapeHtml(phone || 'Not provided');
+      const safeLocation = escapeHtml(location || 'Not provided');
+      const safeLinkedin = escapeHtml(linkedinUrl || 'Not provided');
+      const safePortfolio = escapeHtml(portfolioUrl || 'Not provided');
+      const safeResume = escapeHtml(resumeOriginalName || 'Uploaded (secure storage)');
+      const safeCoverLetter = escapeHtml(coverLetter).replaceAll('\n', '<br/>');
+
+      try {
+        if (inbox) {
+          await emailService.sendMail({
+            to: inbox,
+            subject: `New Job Application - ${roleTitle}`,
+            text: [
+              `Application ID: ${applicationId}`,
+              `Role: ${roleTitle}`,
+              `Name: ${fullName}`,
+              `Email: ${email}`,
+              `Phone: ${phone || 'Not provided'}`,
+              `Location: ${location || 'Not provided'}`,
+              `Years of Experience: ${yearsExperience ?? 'Not provided'}`,
+              `LinkedIn: ${linkedinUrl || 'Not provided'}`,
+              `Portfolio: ${portfolioUrl || 'Not provided'}`,
+              `Resume File: ${resumeOriginalName || 'Uploaded'}`,
+              '',
+              'Cover Letter:',
+              coverLetter,
+            ].join('\n'),
+            html: `
+              <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <h2>New Job Application</h2>
+                <p><strong>Application ID:</strong> ${applicationId}</p>
+                <p><strong>Role:</strong> ${safeRole}</p>
+                <p><strong>Name:</strong> ${safeName}</p>
+                <p><strong>Email:</strong> ${safeEmail}</p>
+                <p><strong>Phone:</strong> ${safePhone}</p>
+                <p><strong>Location:</strong> ${safeLocation}</p>
+                <p><strong>Years of Experience:</strong> ${yearsExperience ?? 'Not provided'}</p>
+                <p><strong>LinkedIn:</strong> ${safeLinkedin}</p>
+                <p><strong>Portfolio:</strong> ${safePortfolio}</p>
+                <p><strong>Resume:</strong> ${safeResume} (available in admin panel)</p>
+                <p><strong>Cover Letter:</strong><br/>${safeCoverLetter}</p>
+              </div>
+            `,
+          });
+        }
+
+        await emailService.sendMail({
+          to: email,
+          subject: 'Application received - Genesis.ai Careers',
+          text: [
+            `Hi ${fullName},`,
+            '',
+            `Thanks for applying to the ${roleTitle} role at Genesis.ai.`,
+            'Our team has received your application and will review it shortly.',
+            '',
+            `Application ID: ${applicationId}`,
+            '',
+            '- Genesis.ai Hiring Team',
+          ].join('\n'),
+          html: `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+              <h2>Application Received</h2>
+              <p>Hi ${escapeHtml(fullName)},</p>
+              <p>Thanks for applying to the <strong>${safeRole}</strong> role at Genesis.ai.</p>
+              <p>Our hiring team has received your application and will review it shortly.</p>
+              <p><strong>Application ID:</strong> ${applicationId}</p>
+              <p style="margin-top: 24px;">- Genesis.ai Hiring Team</p>
+            </div>
+          `,
+        });
+      } catch (mailErr) {
+        console.error('Careers email delivery failed:', mailErr.message);
+      }
+    }
+
+    res.status(201).json({
+      message: 'Application submitted successfully.',
+      applicationId,
+    });
+  } catch (err) {
+    if (req.file?.path) {
+      try {
+        await fs.promises.unlink(req.file.path);
+      } catch (_unlinkErr) {
+        // Ignore cleanup failure in error path.
+      }
+    }
+    next(err);
+  }
+};
+
+const listApplications = async (req, res, next) => {
+  try {
+    const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
+    const pageSizeRaw = Number.parseInt(String(req.query.pageSize || '20'), 10) || 20;
+    const pageSize = Math.min(100, Math.max(1, pageSizeRaw));
+    const offset = (page - 1) * pageSize;
+
+    const status = String(req.query.status || '').trim().toLowerCase();
+    const roleId = String(req.query.roleId || '').trim();
+    const query = String(req.query.q || '').trim();
+
+    const values = [];
+    const whereClauses = [];
+
+    if (status) {
+      values.push(status);
+      whereClauses.push(`status = $${values.length}`);
+    }
+
+    if (roleId) {
+      values.push(roleId);
+      whereClauses.push(`role_id = $${values.length}`);
+    }
+
+    if (query) {
+      values.push(`%${query}%`);
+      whereClauses.push(`(full_name ILIKE $${values.length} OR email ILIKE $${values.length})`);
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+    const countResult = await db.query(
+      `SELECT COUNT(*)::int AS total FROM job_applications ${whereSql}`,
+      values
+    );
+
+    const total = countResult.rows[0]?.total || 0;
+
+    values.push(pageSize, offset);
+
+    const rowsResult = await db.query(
+      `SELECT
+         id,
+         role_id,
+         role_title,
+         full_name,
+         email,
+         phone,
+         location,
+         years_experience,
+         linkedin_url,
+         portfolio_url,
+         resume_original_name,
+         resume_mime_type,
+         resume_size,
+         cover_letter,
+         status,
+         source,
+         created_at,
+         updated_at
+       FROM job_applications
+       ${whereSql}
+       ORDER BY created_at DESC
+       LIMIT $${values.length - 1}
+       OFFSET $${values.length}`,
+      values
+    );
+
+    res.json({
+      applications: rowsResult.rows,
+      pagination: {
+        total,
+        page,
+        pageSize,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
+      filters: {
+        status: status || null,
+        roleId: roleId || null,
+        q: query || null,
+      },
+      statuses: getAllowedStatuses(),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getApplicationStatus = async (req, res, next) => {
+  try {
+    const applicationId = String(req.body?.applicationId || '').trim();
+    const email = String(req.body?.email || '').trim().toLowerCase();
+
+    const result = await db.query(
+      `SELECT
+         id,
+         role_id,
+         role_title,
+         full_name,
+         status,
+         created_at,
+         updated_at
+       FROM job_applications
+       WHERE id = $1 AND LOWER(email) = $2
+       LIMIT 1`,
+      [applicationId, email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: 'No application found for this Application ID and email.',
+      });
+    }
+
+    return res.json({
+      application: result.rows[0],
+      statuses: getAllowedStatuses(),
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const updateApplicationStatus = async (req, res, next) => {
+  try {
+    const status = String(req.body?.status || '').trim().toLowerCase();
+    const result = await db.query(
+      `UPDATE job_applications
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, status, updated_at`,
+      [status, req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Application not found.' });
+    }
+
+    return res.json({ application: result.rows[0] });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const downloadApplicationResume = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT resume_file_path, resume_original_name, resume_mime_type
+       FROM job_applications
+       WHERE id = $1`,
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Application not found.' });
+    }
+
+    const filePath = result.rows[0].resume_file_path;
+    const originalName = result.rows[0].resume_original_name || 'resume';
+    const mimeType = result.rows[0].resume_mime_type || 'application/octet-stream';
+
+    if (!filePath) {
+      return res.status(404).json({ error: 'Resume is not available for this application.' });
+    }
+
+    const resolvedPath = path.resolve(filePath);
+    if (!resolvedPath.startsWith(path.resolve(resumesBaseDir) + path.sep)) {
+      return res.status(403).json({ error: 'Invalid resume path.' });
+    }
+
+    await fs.promises.access(resolvedPath);
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${originalName.replaceAll('"', '')}"`);
+    return res.sendFile(resolvedPath);
+  } catch (err) {
+    if (err.code === 'ENOENT') {
+      return res.status(404).json({ error: 'Resume file not found.' });
+    }
+    return next(err);
+  }
+};
+
+export default {
+  getJobs,
+  applyForJob,
+  listApplications,
+  getApplicationStatus,
+  updateApplicationStatus,
+  downloadApplicationResume,
+};

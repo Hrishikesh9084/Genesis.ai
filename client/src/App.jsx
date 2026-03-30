@@ -23,6 +23,10 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const Contact = lazy(() => import("./pages/Contact"));
+const Careers = lazy(() => import("./pages/Careers"));
+const CareersApply = lazy(() => import("./pages/CareersApply"));
+const CareersStatus = lazy(() => import("./pages/CareersStatus"));
+const AdminApplications = lazy(() => import("./pages/AdminApplications"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function ProtectedRoute({ children }) {
@@ -112,6 +116,9 @@ export default function App() {
             {/* Public route - accessible by everyone */}
             <Route path="/plans" element={<PricingPlans />} />
             <Route path="/about" element={<AboutUs />} />
+            <Route path="/careers" element={<Careers />} />
+            <Route path="/careers/apply" element={<CareersApply />} />
+            <Route path="/careers/status" element={<CareersStatus />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
@@ -123,6 +130,7 @@ export default function App() {
             <Route path="/project/:id/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />
             <Route path="/project/:id/deploy" element={<ProtectedRoute><DeployProject /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/admin/applications" element={<ProtectedRoute><AdminApplications /></ProtectedRoute>} />
 
             {/* OAuth callback - no guard, handles its own auth */}
             <Route path="/auth/github/callback" element={<GithubCallback />} />

@@ -1,0 +1,267 @@
+import { useEffect, useMemo, useState } from "react";
+import api from "../services/api";
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString();
+}
+
+function normalizeFileName(value) {
+  return String(value || "resume").replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+export default function AdminApplications() {
+  const [applications, setApplications] = useState([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, pageSize: 20, totalPages: 1 });
+  const [statuses, setStatuses] = useState(["new", "reviewing", "shortlisted", "rejected", "hired", "archived"]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [updatingId, setUpdatingId] = useState("");
+
+  const [filters, setFilters] = useState({
+    status: "",
+    roleId: "",
+    q: "",
+    page: 1,
+    pageSize: 20,
+  });
+
+  const roleOptions = useMemo(() => {
+    const map = new Map();
+    applications.forEach((item) => {
+      if (item.role_id && item.role_title) {
+        map.set(item.role_id, item.role_title);
+      }
+    });
+    return Array.from(map.entries()).map(([id, title]) => ({ id, title }));
+  }, [applications]);
+
+  const loadApplications = async () => {
+    setLoading(true);
+    setErrorMessage("");
+
+    try {
+      const response = await api.get("/careers/admin/applications", {
+        params: {
+          status: filters.status || undefined,
+          roleId: filters.roleId || undefined,
+          q: filters.q || undefined,
+          page: filters.page,
+          pageSize: filters.pageSize,
+        },
+      });
+
+      setApplications(response.data?.applications || []);
+      setPagination(response.data?.pagination || { total: 0, page: 1, pageSize: 20, totalPages: 1 });
+      if (Array.isArray(response.data?.statuses) && response.data.statuses.length > 0) {
+        setStatuses(response.data.statuses);
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || "Unable to load applications.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadApplications();
+  }, [filters.page, filters.pageSize, filters.status, filters.roleId, filters.q]);
+
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target;
+    setFilters((prev) => ({ ...prev, [name]: value, page: 1 }));
+  };
+
+  const handleStatusUpdate = async (applicationId, nextStatus) => {
+    setUpdatingId(applicationId);
+    setErrorMessage("");
+    try {
+      await api.patch(`/careers/admin/applications/${applicationId}/status`, { status: nextStatus });
+      setApplications((prev) =>
+        prev.map((item) =>
+          item.id === applicationId ? { ...item, status: nextStatus, updated_at: new Date().toISOString() } : item
+        )
+      );
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || "Failed to update application status.");
+    } finally {
+      setUpdatingId("");
+    }
+  };
+
+  const handleResumeDownload = async (application) => {
+    try {
+      const response = await api.get(`/careers/admin/applications/${application.id}/resume`, {
+        responseType: "blob",
+      });
+
+      const blobUrl = window.URL.createObjectURL(response.data);
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = normalizeFileName(application.resume_original_name || `${application.full_name}-resume`);
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || "Failed to download resume.");
+    }
+  };
+
+  return (
+    <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:py-14 text-slate-200">
+      <div className="rounded-2xl border border-white/10 bg-black/40 p-6 sm:p-8 md:p-10 backdrop-blur-sm">
+        <p className="inline-flex rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-orange-300">
+          Internal Admin
+        </p>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white">Job Applications</h1>
+        <p className="mt-3 text-sm leading-7 text-slate-300">
+          Review candidate applications, filter by status/role, update hiring stage, and download uploaded resumes.
+        </p>
+
+        {errorMessage && (
+          <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {errorMessage}
+          </div>
+        )}
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="mb-1.5 block text-xs uppercase tracking-wide text-slate-400">Status</label>
+            <select className="input-field" name="status" value={filters.status} onChange={handleFilterChange}>
+              <option value="">All statuses</option>
+              {statuses.map((status) => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs uppercase tracking-wide text-slate-400">Role</label>
+            <select className="input-field" name="roleId" value={filters.roleId} onChange={handleFilterChange}>
+              <option value="">All roles</option>
+              {roleOptions.map((role) => (
+                <option key={role.id} value={role.id}>{role.title}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs uppercase tracking-wide text-slate-400">Search</label>
+            <input
+              className="input-field"
+              name="q"
+              value={filters.q}
+              onChange={handleFilterChange}
+              placeholder="Name or email"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-xs uppercase tracking-wide text-slate-400">Rows per page</label>
+            <select className="input-field" name="pageSize" value={filters.pageSize} onChange={handleFilterChange}>
+              {[10, 20, 50, 100].map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-6 overflow-x-auto rounded-xl border border-white/10">
+          <table className="w-full min-w-275 border-collapse text-left text-sm">
+            <thead className="bg-white/5 text-slate-300">
+              <tr>
+                <th className="px-4 py-3">Candidate</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Experience</th>
+                <th className="px-4 py-3">Applied At</th>
+                <th className="px-4 py-3">Resume</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-300">Loading applications...</td>
+                </tr>
+              )}
+
+              {!loading && applications.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">No applications found.</td>
+                </tr>
+              )}
+
+              {!loading && applications.map((application) => (
+                <tr key={application.id} className="border-t border-white/10 align-top">
+                  <td className="px-4 py-4">
+                    <p className="font-medium text-white">{application.full_name}</p>
+                    <p className="text-slate-300">{application.email}</p>
+                    <p className="text-xs text-slate-400">{application.phone || "No phone"}</p>
+                  </td>
+                  <td className="px-4 py-4">
+                    <p className="text-white">{application.role_title}</p>
+                    <p className="text-xs text-slate-400">{application.role_id}</p>
+                  </td>
+                  <td className="px-4 py-4 text-slate-300">{application.years_experience ?? "-"}</td>
+                  <td className="px-4 py-4 text-slate-300">{formatDateTime(application.created_at)}</td>
+                  <td className="px-4 py-4">
+                    {application.resume_original_name ? (
+                      <button
+                        type="button"
+                        onClick={() => handleResumeDownload(application)}
+                        className="rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 text-xs text-orange-200 hover:bg-orange-500/20"
+                      >
+                        Download
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-500">No file</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4">
+                    <select
+                      className="input-field h-10"
+                      value={application.status}
+                      disabled={updatingId === application.id}
+                      onChange={(event) => handleStatusUpdate(application.id, event.target.value)}
+                    >
+                      {statuses.map((status) => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between text-sm text-slate-300">
+          <p>
+            Showing page {pagination.page} of {Math.max(1, pagination.totalPages)} ({pagination.total} total)
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="btn-secondary rounded-lg px-4 py-2"
+              disabled={pagination.page <= 1}
+              onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="btn-secondary rounded-lg px-4 py-2"
+              disabled={pagination.page >= pagination.totalPages}
+              onClick={() => setFilters((prev) => ({ ...prev, page: Math.min(pagination.totalPages, prev.page + 1) }))}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}

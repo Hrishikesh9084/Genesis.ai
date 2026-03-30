@@ -55,5 +55,32 @@ CREATE TABLE IF NOT EXISTS deployments (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS job_applications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  role_id VARCHAR(120) NOT NULL,
+  role_title VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  phone VARCHAR(50),
+  location VARCHAR(255),
+  years_experience INTEGER,
+  linkedin_url TEXT,
+  portfolio_url TEXT,
+  resume_file_path TEXT,
+  resume_original_name TEXT,
+  resume_mime_type VARCHAR(150),
+  resume_size INTEGER,
+  cover_letter TEXT NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'new',
+  source VARCHAR(50) NOT NULL DEFAULT 'website',
+  meta JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_deployments_project_id ON deployments(project_id);
+CREATE INDEX IF NOT EXISTS idx_job_applications_email ON job_applications(email);
+CREATE INDEX IF NOT EXISTS idx_job_applications_role_id ON job_applications(role_id);
+CREATE INDEX IF NOT EXISTS idx_job_applications_status ON job_applications(status);
+CREATE INDEX IF NOT EXISTS idx_job_applications_created_at ON job_applications(created_at DESC);
