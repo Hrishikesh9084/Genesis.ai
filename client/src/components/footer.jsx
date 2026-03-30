@@ -70,16 +70,16 @@ export default function Footer() {
         <div className="flex flex-col lg:items-center lg:justify-center">
           <div className="flex flex-col text-sm space-y-2.5">
             <h2 className="font-semibold mb-5 text-white">Company</h2>
-            <a className="hover:text-slate-600 transition" href="#">
+            <a className="hover:text-orange-600 transition" href="#">
               About us
             </a>
-            <a className="hover:text-slate-600 transition" href="#">
+            <a className="hover:text-orange-600 transition" href="#">
               Careers
             </a>
-            <a className="hover:text-slate-600 transition" href="#">
+            <a className="hover:text-orange-600 transition" href="#">
               Contact us
             </a>
-            <Link className="hover:text-slate-600 transition" to="/privacy-policy" onClick={()=>scrollTo(0,0)}>
+            <Link className="hover:text-orange-600 transition" to="/privacy-policy" onClick={()=>scrollTo(0,0)}>
               Privacy policy
             </Link>
           </div>

@@ -3,7 +3,7 @@ import { useAuth } from "./context/AuthContext";
 import { Navigate, Route, Routes } from "react-router-dom";
 import LenisScroll from "./components/lenis-scroll";
 import Navbar from "./components/navbar";
-import Footer from "./components/footer";
+import Footer from "./components/Footer";
 import Background from "./components/Background";
 import ScrollToTop from "./components/ScrollToTop";
 import LoadingSpinner from "./components/LoadingSpinner";
