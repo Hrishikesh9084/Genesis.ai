@@ -112,7 +112,7 @@ export default function Footer() {
         </p>
         <div className="flex items-center gap-4">
           <Link to="/privacy-policy" onClick={()=>scrollTo(0,0)}>Privacy Policy</Link>
-          <Link to="/">Terms of Service</Link>
+          <Link to="/terms-of-service" onClick={()=>scrollTo(0,0)}>Terms of Service</Link>
           <Link to="/">Cookie Policy</Link>
         </div>
       </div>

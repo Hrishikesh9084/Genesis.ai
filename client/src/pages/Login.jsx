@@ -10,6 +10,7 @@ import { validateLoginInput } from '../utils/validators';
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -62,6 +63,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!acceptedTerms) {
+      toast.error("Please accept the Terms and Conditions to continue.");
+      return;
+    }
+
     const validationError = validateLoginInput({ email, password });
     if (validationError) {
       toast.error(validationError);
@@ -112,9 +119,29 @@ const Login = () => {
           />
         </div>
 
+        <label className="flex items-start gap-2 text-sm text-gray-300">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 rounded border-gray-600 bg-gray-900 text-orange-500 focus:ring-orange-500"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+          />
+          <span>
+            I accept the{" "}
+            <Link to="/terms-of-service" className="text-orange-400 hover:text-orange-300" target="_blank" rel="noreferrer">
+              Terms and Conditions
+            </Link>{" "}
+            and{" "}
+            <Link to="/privacy-policy" className="text-orange-400 hover:text-orange-300" target="_blank" rel="noreferrer">
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !acceptedTerms}
           className="btn-primary w-full flex items-center justify-center gap-2"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
