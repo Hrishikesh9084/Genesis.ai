@@ -107,7 +107,7 @@ const submitContact = async (req, res, next) => {
     });
 
     res.status(201).json({
-      message: 'Message received. A confirmation email has been sent.',
+      message: 'Message received.',
     });
   } catch (err) {
     next(err);
