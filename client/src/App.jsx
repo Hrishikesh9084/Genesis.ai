@@ -3,7 +3,7 @@ import { useAuth } from "./context/AuthContext";
 import { Navigate, Route, Routes } from "react-router-dom";
 import LenisScroll from "./components/lenis-scroll";
 import Navbar from "./components/navbar";
-import Footer from "./components/Footer";
+import Footer from "./components/footer";
 import Background from "./components/Background";
 import ScrollToTop from "./components/ScrollToTop";
 import LoadingSpinner from "./components/LoadingSpinner";
@@ -21,6 +21,8 @@ const Settings = lazy(() => import("./pages/Settings"));
 const GithubCallback = lazy(() => import("./pages/GithubCallback"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const AboutUs = lazy(() => import("./pages/AboutUs"));
+const Contact = lazy(() => import("./pages/Contact"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function ProtectedRoute({ children }) {
@@ -109,6 +111,8 @@ export default function App() {
 
             {/* Public route - accessible by everyone */}
             <Route path="/plans" element={<PricingPlans />} />
+            <Route path="/about" element={<AboutUs />} />
+            <Route path="/contact" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
 

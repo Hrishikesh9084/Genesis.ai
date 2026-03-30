@@ -52,6 +52,8 @@ export default function Navbar() {
   const publicLinks = [
     { name: "Home", href: "/" },
     { name: "Pricing", href: "/plans" },
+    { name: "About", href: "/about" },
+    { name: "Contact", href: "/contact" },
   ];
 
   const authLinks = [
