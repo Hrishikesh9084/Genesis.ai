@@ -5,19 +5,19 @@ import api from "../services/api";
 const contactCards = [
   {
     title: "Email",
-    value: "hello@genesis-ai.example",
+    value: "hello@genesis.ai@gmail.com",
     helper: "We reply within 1 business day.",
     icon: Mail,
   },
   {
     title: "Phone",
-    value: "+1 (555) 014-9230",
+    value: "+91 9503908995",
     helper: "Mon-Fri, 9:00 AM to 6:00 PM",
     icon: Phone,
   },
   {
     title: "Office",
-    value: "San Francisco, CA",
+    value: "Nashik Maharashtra, India",
     helper: "Remote-first team with global coverage.",
     icon: MapPin,
   },
