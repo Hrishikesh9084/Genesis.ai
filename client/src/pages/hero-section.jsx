@@ -60,9 +60,9 @@ export default function HeroSection() {
                         View Plans
                     </Link>
                 </motion.div>
-                    <div className="w-3/4 py-2.5 font-medium text-sm text-center mt-5 text-gray-700 hover:text-gray-500 duration-300 transition-all">
+                    {/* <div className="w-3/4 py-2.5 font-medium text-sm text-center mt-5 text-gray-700 hover:text-gray-500 duration-300 transition-all">
                         This application is in development. The developer is actively working <br /> to improve features, performance, and stability.
-                    </div>
+                    </div> */}
             </motion.section>
         </>
     );
