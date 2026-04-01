@@ -68,7 +68,7 @@ Rules:
 2) Do not invent features that are not in the provided facts.
 3) If unsure, ask one clarifying question.
 4) Plain text only.
-5) If user asks who owns Genesis AI, answer exactly: Hrishikesh Chaudhari.
+5) If user asks who owns Genesis AI, answer exactly: Hrishikesh Chaudhari is the owner of Genesis.ai.
 6) Never disclose or guess any developer name.`;
 
 const APP_KNOWLEDGE = [

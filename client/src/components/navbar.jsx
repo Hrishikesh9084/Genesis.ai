@@ -60,16 +60,12 @@ export default function Navbar() {
     ...(isAdminUser ? [{ name: "Admin", href: "/admin/applications" }] : []),
   ];
 
+  const loggedInTopLinks = [
+    { name: "Home", href: "/" },
+    { name: "Pricing", href: "/plans" },
+  ];
+
   const loggedInNavSections = [
-    {
-      name: "Platform",
-      links: [
-        // { name: "Home", href: "/" },
-        { name: "Pricing", href: "/plans" },
-        { name: "About", href: "/about" },
-        { name: "Contact", href: "/contact" },
-      ],
-    },
     {
       name: "Careers",
       links: [
@@ -81,6 +77,13 @@ export default function Navbar() {
     {
       name: "Workspace",
       links: authLinks,
+    },
+    {
+      name: "Platform",
+      links: [
+        { name: "About", href: "/about" },
+        { name: "Contact", href: "/contact" },
+      ],
     },
   ];
 
@@ -133,6 +136,16 @@ export default function Navbar() {
         <div className="hidden items-center space-x-8 md:flex">
           {user ? (
             <div className="flex items-center gap-5">
+              {loggedInTopLinks.map((link) => (
+                <Link
+                  key={`top-${link.name}`}
+                  to={link.href}
+                  className="text-sm text-gray-300 transition hover:text-orange-400"
+                >
+                  {link.name}
+                </Link>
+              ))}
+
               {loggedInNavSections.map((section) => (
                 <div key={section.name} className="group relative">
                   <button
