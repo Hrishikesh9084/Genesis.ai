@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Bot, MessageCircle, Send, X, Loader2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import api from "../services/api";
 
 function sourceLabel(source) {
@@ -59,9 +60,16 @@ export default function HelpBot() {
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-60 p-5">
-      {isOpen && (
-        <div className="mb-3 w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-white/15 bg-gray-950/95 p-2 backdrop-blur-xl shadow-2xl">
+    <div className="fixed bottom-2 right-2 z-60 p-2 sm:bottom-5 sm:right-5 sm:p-5">
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="mb-2 w-[calc(100vw-1rem)] max-w-sm rounded-2xl border border-white/15 bg-gray-950/95 p-2 backdrop-blur-xl shadow-2xl sm:mb-3 sm:w-96"
+          >
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3.5">
             <div className="flex items-center gap-2">
               <Bot className="h-4 w-4 text-orange-400" />
@@ -78,12 +86,15 @@ export default function HelpBot() {
 
           <div
             data-lenis-prevent
-            className="max-h-80 overflow-y-auto overscroll-contain touch-pan-y px-4 py-4 space-y-2.5"
+            className="max-h-[55vh] overflow-y-auto overscroll-contain touch-pan-y px-3 py-3 space-y-2.5 sm:max-h-80 sm:px-4 sm:py-4"
           >
             {messages.map((msg, index) => (
-              <div
+              <motion.div
                 key={`${msg.role}-${index}`}
-                className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, delay: Math.min(index * 0.03, 0.2) }}
+                className={`max-w-[92%] wrap-break-word rounded-xl px-3 py-2 text-sm sm:max-w-[90%] ${
                   msg.role === "user"
                     ? "ml-auto bg-orange-500 text-white"
                     : "mr-auto bg-white/10 text-gray-100"
@@ -95,17 +106,22 @@ export default function HelpBot() {
                     Source: {sourceLabel(msg.source)}
                   </div>
                 )}
-              </div>
+              </motion.div>
             ))}
             {sending && (
-              <div className="mr-auto inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm text-gray-200">
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mr-auto inline-flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm text-gray-200"
+              >
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Thinking...
-              </div>
+              </motion.div>
             )}
           </div>
 
-          <div className="border-t border-white/10 p-4">
+          <div className="border-t border-white/10 p-3 sm:p-4">
             <div className="flex items-center gap-2">
               <input
                 value={input}
@@ -113,7 +129,7 @@ export default function HelpBot() {
                 onKeyDown={(event) => {
                   if (event.key === "Enter") sendMessage();
                 }}
-                className="input-field h-10"
+                className="input-field h-10 min-w-0 flex-1"
                 placeholder="Ask your question..."
               />
               <button
@@ -126,17 +142,28 @@ export default function HelpBot() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <button
+      <motion.button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className="ml-auto flex h-12 w-12 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg shadow-orange-500/30 hover:bg-orange-600"
         title="Open help bot"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        whileHover={{ scale: 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        transition={{ type: "spring", stiffness: 380, damping: 22 }}
       >
-        {isOpen ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
-      </button>
+        <motion.div
+          animate={{ rotate: isOpen ? 90 : 0 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+        >
+          {isOpen ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
+        </motion.div>
+      </motion.button>
     </div>
   );
 }

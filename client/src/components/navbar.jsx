@@ -59,10 +59,12 @@ export default function Navbar() {
     { name: "New Project", href: "/new-project" },
   ];
 
-  const adminLinks = isAdminUser ? [
-    { name: "Job Applications", href: "/admin/applications" },
-    { name: "Newsletter", href: "/admin/newsletter" }
-  ] : [];
+  const adminLinks = isAdminUser
+    ? [
+        { name: "Job Applications", href: "/admin/applications" },
+        { name: "Newsletter", href: "/admin/newsletter" },
+      ]
+    : [];
 
   const loggedInTopLinks = [
     { name: "Home", href: "/" },
@@ -82,10 +84,14 @@ export default function Navbar() {
       name: "Workspace",
       links: authLinks,
     },
-    ...(isAdminUser ? [{
-      name: "Admin",
-      links: adminLinks,
-    }] : []),
+    ...(isAdminUser
+      ? [
+          {
+            name: "Admin",
+            links: adminLinks,
+          },
+        ]
+      : []),
     {
       name: "Platform",
       links: [
@@ -95,7 +101,9 @@ export default function Navbar() {
     },
   ];
 
-  const mobileLinks = user ? [...publicLinks, ...authLinks, ...adminLinks] : publicLinks;
+  const mobileLinks = user
+    ? [...publicLinks, ...authLinks, ...adminLinks]
+    : publicLinks;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -115,6 +123,27 @@ export default function Navbar() {
 
   return (
     <>
+      <style>{`
+                @keyframes shine {
+                    0% {
+                        background-position: 0% 50%;
+                    }
+            
+                    50% {
+                        background-position: 100% 50%;
+                    }
+            
+                    100% {
+                        background-position: 0% 50%;
+                    }
+                }
+            
+                .button-bg {
+                    background: conic-gradient(from 0deg, #00F5FF, #000, #000, #00F5FF, #000, #000, #000, #00F5FF);
+                    background-size: 300% 300%;
+                    animation: shine 6s ease-out infinite;
+                }
+            `}</style>
       <motion.nav
         className={`sticky top-0 z-50 flex w-full items-center justify-between px-4 py-3.5 md:px-16 lg:px-24 transition-colors ${isScrolled ? "bg-black/50 backdrop-blur-lg" : ""}`}
         initial={{ y: -100, opacity: 0 }}
@@ -192,29 +221,33 @@ export default function Navbar() {
           {user ? (
             <button
               onClick={() => navigate("/settings")}
-              className="flex items-center gap-2 rounded-full border border-gray-700/70 px-3 py-1 hover:border-orange-500/50 transition-colors"
+              className="flex items-center gap-2 rounded-full border border-gray-700/70  hover:border-orange-500/50 transition-colors"
               title={user.name || "Profile"}
             >
-              <span
+              <button
                 onClick={(event) => {
                   event.stopPropagation();
                   navigate("/plans");
                 }}
-                className="rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-0.5 text-xs text-orange-300 hover:bg-orange-500/20"
+                className="px-5 text-sm py-2.5 text-white rounded-full font-medium bg-transparent border border-orange-500 cursor-pointer"
                 title="Buy credits"
               >
                 {Number(user?.credits || 0)} credits
-              </span>
+              </button>
               <UserAvatar user={user} />
-              <span className="text-sm text-gray-300 max-w-24 truncate">{user.name}</span>
+              <span className="text-sm text-gray-300 max-w-24 truncate">
+                {user.name}
+              </span>
             </button>
           ) : (
-            <Link to="/register" className="btn bg-linear-to-r from-orange-500 to-orange-600 text-sm border-0 shadow-lg shadow-orange-500/20">
+            <Link
+              to="/register"
+              className="btn bg-linear-to-r from-orange-500 to-orange-600 text-sm border-0 shadow-lg shadow-orange-500/20"
+            >
               Sign Up
             </Link>
           )}
           <NetworkStatus />
-
         </div>
 
         <div className="flex items-center gap-3 md:hidden">
@@ -232,26 +265,37 @@ export default function Navbar() {
         className={`fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-black/20 text-lg font-medium backdrop-blur-2xl transition duration-300 md:hidden ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         {user && (
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              navigate("/plans");
-            }}
-            className="rounded-full border border-orange-500/40 bg-orange-500/10 px-4 py-1.5 text-sm text-orange-300 hover:bg-orange-500/20 cursor-pointer"
-          >
-            Credits: {Number(user?.credits || 0)}
-          </button>
+          <div className="button-bg rounded-full p-0.5 hover:scale-105 transition duration-300 active:scale-100">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                navigate("/plans");
+              }}
+              className="px-8 text-sm py-2.5 text-white rounded-full font-medium bg-gray-800"
+            >
+              Credits: {Number(user?.credits || 0)}
+            </button>
+          </div>
         )}
-          
+
         {mobileLinks.map((link) => (
-          <Link key={link.name} to={link.href} onClick={() => setIsOpen(false)} className="hover:text-orange-400 transition">
+          <Link
+            key={link.name}
+            to={link.href}
+            onClick={() => setIsOpen(false)}
+            className="hover:text-orange-400 transition"
+          >
             {link.name}
           </Link>
         ))}
 
         {!user && (
-          <Link to="/register" className="btn bg-linear-to-r from-orange-500 to-orange-600 border-0" onClick={() => setIsOpen(false)}>
+          <Link
+            to="/register"
+            className="btn bg-linear-to-r from-orange-500 to-orange-600 border-0"
+            onClick={() => setIsOpen(false)}
+          >
             Sign Up
           </Link>
         )}

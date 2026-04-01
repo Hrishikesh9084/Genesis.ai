@@ -12,7 +12,9 @@ createRoot(document.getElementById("root")).render(
       <Toaster
         position="top-right"
         containerStyle={{
-          right: 72,
+          top: 88,
+          right: 16,
+          zIndex: 9999,
         }}
         toastOptions={{
           style: {
