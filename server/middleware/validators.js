@@ -193,10 +193,28 @@ function validateUpdateProfile(req, res, next) {
 }
 
 function validateDeployBody(req, res, next) {
-  const { platform } = req.body || {};
+  const { target } = req.body || {};
 
-  if (!['vercel', 'render'].includes(platform)) {
-    return badRequest(res, 'Platform must be "vercel" or "render".');
+  if (target !== undefined && !['frontend', 'backend', 'fullstack'].includes(target)) {
+    return badRequest(res, 'target must be "frontend", "backend", or "fullstack".');
+  }
+
+  next();
+}
+
+function validateDeploymentKeys(req, res, next) {
+  const { vercel_token, render_api_key, render_owner_id } = req.body || {};
+
+  if (vercel_token !== undefined && typeof vercel_token !== 'string') {
+    return badRequest(res, 'vercel_token must be a string.');
+  }
+
+  if (render_api_key !== undefined && typeof render_api_key !== 'string') {
+    return badRequest(res, 'render_api_key must be a string.');
+  }
+
+  if (render_owner_id !== undefined && typeof render_owner_id !== 'string') {
+    return badRequest(res, 'render_owner_id must be a string.');
   }
 
   next();
@@ -518,6 +536,7 @@ export default {
   validateGithubPush,
   validateUpdateProfile,
   validateDeployBody,
+  validateDeploymentKeys,
   validateDeployIdParam,
   validateContactSubmission,
   validateCareerApplication,

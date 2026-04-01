@@ -17,6 +17,8 @@ router.get('/me', authenticate, authController.getMe);
 router.put('/profile', authenticate, validators.validateUpdateProfile, authController.updateProfile);
 router.post('/profile-image', authenticate, upload.uploadAvatarImage, authController.uploadProfileImage);
 router.put('/github-token', authenticate, authController.updateGithubToken);
+router.get('/deployment-keys', authenticate, authController.getDeploymentKeys);
+router.put('/deployment-keys', authenticate, validators.validateDeploymentKeys, authController.updateDeploymentKeys);
 router.delete('/account', authenticate, authController.deleteAccount);
 
 // GitHub OAuth

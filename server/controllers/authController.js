@@ -5,6 +5,7 @@ import db from '../config/db.js';
 import emailService from '../services/emailService.js';
 
 let ensureVerificationColumnsPromise;
+let ensureDeploymentKeyColumnsPromise;
 
 function ensureVerificationColumns() {
   if (!ensureVerificationColumnsPromise) {
@@ -23,6 +24,28 @@ function ensureVerificationColumns() {
   }
 
   return ensureVerificationColumnsPromise;
+}
+
+function ensureDeploymentKeyColumns() {
+  if (!ensureDeploymentKeyColumnsPromise) {
+    ensureDeploymentKeyColumnsPromise = db
+      .query(`
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS vercel_token TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS render_api_key TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS render_owner_id TEXT;
+      `)
+      .catch((err) => {
+        ensureDeploymentKeyColumnsPromise = null;
+        throw err;
+      });
+  }
+
+  return ensureDeploymentKeyColumnsPromise;
 }
 
 function generateToken(user) {
@@ -394,6 +417,87 @@ const updateGithubToken = async (req, res, next) => {
     res.json({ message: 'GitHub token updated successfully.' });
   } catch (err) {
     next(err);
+  }
+};
+
+const getDeploymentKeys = async (req, res, next) => {
+  try {
+    await ensureDeploymentKeyColumns();
+
+    const result = await db.query(
+      'SELECT vercel_token, render_api_key, render_owner_id FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const row = result.rows[0];
+    return res.json({
+      keys: {
+        has_vercel_token: Boolean(row.vercel_token),
+        has_render_api_key: Boolean(row.render_api_key),
+        render_owner_id: row.render_owner_id || '',
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
+const updateDeploymentKeys = async (req, res, next) => {
+  try {
+    await ensureDeploymentKeyColumns();
+
+    const { vercel_token, render_api_key, render_owner_id } = req.body || {};
+
+    const nextVercelToken =
+      vercel_token === undefined ? null : String(vercel_token).trim();
+    const nextRenderApiKey =
+      render_api_key === undefined ? null : String(render_api_key).trim();
+    const nextRenderOwnerId =
+      render_owner_id === undefined ? null : String(render_owner_id).trim();
+
+    const result = await db.query(
+      `UPDATE users
+       SET
+         vercel_token = CASE
+           WHEN $1::text IS NULL THEN vercel_token
+           WHEN $1 = '' THEN NULL
+           ELSE $1
+         END,
+         render_api_key = CASE
+           WHEN $2::text IS NULL THEN render_api_key
+           WHEN $2 = '' THEN NULL
+           ELSE $2
+         END,
+         render_owner_id = CASE
+           WHEN $3::text IS NULL THEN render_owner_id
+           WHEN $3 = '' THEN NULL
+           ELSE $3
+         END,
+         updated_at = NOW()
+       WHERE id = $4
+       RETURNING vercel_token, render_api_key, render_owner_id`,
+      [nextVercelToken, nextRenderApiKey, nextRenderOwnerId, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const row = result.rows[0];
+    return res.json({
+      message: 'Deployment keys updated successfully.',
+      keys: {
+        has_vercel_token: Boolean(row.vercel_token),
+        has_render_api_key: Boolean(row.render_api_key),
+        render_owner_id: row.render_owner_id || '',
+      },
+    });
+  } catch (err) {
+    return next(err);
   }
 };
 
@@ -828,6 +932,8 @@ export default {
   updateProfile,
   uploadProfileImage,
   updateGithubToken,
+  getDeploymentKeys,
+  updateDeploymentKeys,
   deleteAccount,
   verifyEmail,
   resendVerificationEmail,

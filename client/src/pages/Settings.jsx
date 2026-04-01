@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Github, Key, Save, Loader2, User, Upload, AlertTriangle, Trash2, LogOut, DeleteIcon } from 'lucide-react';
+import { Github, Key, Save, Loader2, User, Upload, AlertTriangle, Trash2, LogOut, DeleteIcon, Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -10,6 +10,18 @@ export default function Settings() {
   const navigate = useNavigate();
   const [githubToken, setGithubToken] = useState('');
   const [saving, setSaving] = useState(false);
+  const [vercelToken, setVercelToken] = useState('');
+  const [renderApiKey, setRenderApiKey] = useState('');
+  const [renderOwnerId, setRenderOwnerId] = useState('');
+  const [hasVercelToken, setHasVercelToken] = useState(false);
+  const [hasRenderApiKey, setHasRenderApiKey] = useState(false);
+  const [savingDeployKeys, setSavingDeployKeys] = useState(false);
+  const [loadingDeployKeys, setLoadingDeployKeys] = useState(true);
+  const [savedRenderOwnerId, setSavedRenderOwnerId] = useState('');
+  const [showVercelToken, setShowVercelToken] = useState(false);
+  const [showRenderApiKey, setShowRenderApiKey] = useState(false);
+  const [removingVercelToken, setRemovingVercelToken] = useState(false);
+  const [removingRenderApiKey, setRemovingRenderApiKey] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profileImage, setProfileImage] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -21,6 +33,26 @@ export default function Settings() {
     setProfileName(user?.name || '');
     setProfileImage(user?.avatar_url || '');
   }, [user]);
+
+  useEffect(() => {
+    const fetchDeploymentKeys = async () => {
+      try {
+        const res = await api.get('/auth/deployment-keys');
+        const keys = res.data?.keys || {};
+        setHasVercelToken(Boolean(keys.has_vercel_token));
+        setHasRenderApiKey(Boolean(keys.has_render_api_key));
+        const ownerId = keys.render_owner_id || '';
+        setRenderOwnerId(ownerId);
+        setSavedRenderOwnerId(ownerId);
+      } catch {
+        toast.error('Failed to load deployment key status');
+      } finally {
+        setLoadingDeployKeys(false);
+      }
+    };
+
+    fetchDeploymentKeys();
+  }, []);
 
   const handleSaveProfile = async () => {
     const trimmedName = profileName.trim();
@@ -94,6 +126,72 @@ export default function Settings() {
       toast.error('Failed to save token');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveDeploymentKeys = async () => {
+    const payload = {};
+    const nextVercelToken = vercelToken.trim();
+    const nextRenderApiKey = renderApiKey.trim();
+    const nextOwnerId = renderOwnerId.trim();
+
+    if (nextVercelToken) {
+      payload.vercel_token = nextVercelToken;
+    }
+
+    if (nextRenderApiKey) {
+      payload.render_api_key = nextRenderApiKey;
+    }
+
+    if (nextOwnerId !== savedRenderOwnerId) {
+      payload.render_owner_id = nextOwnerId;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      toast.error('Enter a deployment key or change Render owner ID first');
+      return;
+    }
+
+    setSavingDeployKeys(true);
+    try {
+      const res = await api.put('/auth/deployment-keys', payload);
+      const keys = res.data?.keys || {};
+      setHasVercelToken(Boolean(keys.has_vercel_token));
+      setHasRenderApiKey(Boolean(keys.has_render_api_key));
+      const ownerId = keys.render_owner_id || '';
+      setRenderOwnerId(ownerId);
+      setSavedRenderOwnerId(ownerId);
+      setVercelToken('');
+      setRenderApiKey('');
+      toast.success('Deployment keys updated');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save deployment keys');
+    } finally {
+      setSavingDeployKeys(false);
+    }
+  };
+
+  const handleRemoveDeploymentKey = async (keyType) => {
+    const payload = keyType === 'vercel'
+      ? { vercel_token: '' }
+      : { render_api_key: '' };
+
+    if (keyType === 'vercel') setRemovingVercelToken(true);
+    if (keyType === 'render') setRemovingRenderApiKey(true);
+
+    try {
+      const res = await api.put('/auth/deployment-keys', payload);
+      const keys = res.data?.keys || {};
+      setHasVercelToken(Boolean(keys.has_vercel_token));
+      setHasRenderApiKey(Boolean(keys.has_render_api_key));
+      setVercelToken('');
+      setRenderApiKey('');
+      toast.success(`${keyType === 'vercel' ? 'Vercel token' : 'Render API key'} removed`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to remove key');
+    } finally {
+      if (keyType === 'vercel') setRemovingVercelToken(false);
+      if (keyType === 'render') setRemovingRenderApiKey(false);
     }
   };
 
@@ -246,26 +344,173 @@ export default function Settings() {
         </p>
       </div>
 
-      {/* API Keys Info */}
+      {/* Deployment Keys */}
       <div className="card">
         <div className="flex items-center space-x-3 mb-4">
           <Key className="w-5 h-5 text-orange-400" />
           <h2 className="text-lg font-semibold">Deployment Keys</h2>
         </div>
         <p className="text-sm text-gray-400 mb-4">
-          Deployment API keys (Vercel, Render) are configured on the server side by the administrator.
-          Contact your admin to set up deployment capabilities.
+          Add your Vercel and Render API keys to deploy frontend and backend separately from the Deploy page.
         </p>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-            <span className="text-gray-300">Vercel</span>
-            <span className="text-xs px-2 py-1 bg-gray-700 rounded text-gray-400">Server-side</span>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-            <span className="text-gray-300">Render</span>
-            <span className="text-xs px-2 py-1 bg-gray-700 rounded text-gray-400">Server-side</span>
+
+        <div className="mb-4 rounded-lg border border-gray-800 bg-gray-900/60 p-3 text-xs text-gray-300">
+          <p className="font-medium text-gray-100 mb-2">Generate Deployment Keys</p>
+          <div className="space-y-2">
+            <p>
+              1. Vercel token: go to{' '}
+              <a
+                href="https://vercel.com/account/tokens"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-orange-400 hover:underline"
+              >
+                Vercel Dashboard - Account Tokens
+              </a>{' '}
+              and create a new token.
+            </p>
+            <p>
+              2. Render API key: go to{' '}
+              <a
+                href="https://dashboard.render.com/account/api-keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-orange-400 hover:underline"
+              >
+                Render Dashboard - API Keys
+              </a>{' '}
+              and create a key.
+            </p>
+            <p>
+              3. Optional owner ID (Render): open{' '}
+              <a
+                href="https://dashboard.render.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-orange-400 hover:underline"
+              >
+                Render Dashboard
+              </a>{' '}
+              and copy workspace owner ID if you want to set it manually.
+            </p>
           </div>
         </div>
+
+        {loadingDeployKeys ? (
+          <p className="text-sm text-gray-500">Loading key status...</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                <span className="text-gray-300">Vercel Token</span>
+                <span className={`text-xs px-2 py-1 rounded ${hasVercelToken ? 'bg-green-900/40 text-green-300' : 'bg-gray-700 text-gray-400'}`}>
+                  {hasVercelToken ? 'Configured' : 'Missing'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                <span className="text-gray-300">Render API Key</span>
+                <span className={`text-xs px-2 py-1 rounded ${hasRenderApiKey ? 'bg-green-900/40 text-green-300' : 'bg-gray-700 text-gray-400'}`}>
+                  {hasRenderApiKey ? 'Configured' : 'Missing'}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Vercel Token</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showVercelToken ? 'text' : 'password'}
+                    value={vercelToken}
+                    onChange={(e) => setVercelToken(e.target.value)}
+                    placeholder={hasVercelToken ? 'Token saved (masked). Enter new value to replace.' : 'Enter Vercel token'}
+                    className="input-field pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowVercelToken((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    aria-label={showVercelToken ? 'Hide Vercel token input' : 'Show Vercel token input'}
+                  >
+                    {showVercelToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDeploymentKey('vercel')}
+                  disabled={!hasVercelToken || removingVercelToken}
+                  className="px-3 py-2 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {removingVercelToken ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
+              {hasVercelToken && (
+                <p className="text-xs text-gray-500 mt-1">Saved token: ************</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Render API Key</label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showRenderApiKey ? 'text' : 'password'}
+                    value={renderApiKey}
+                    onChange={(e) => setRenderApiKey(e.target.value)}
+                    placeholder={hasRenderApiKey ? 'Key saved (masked). Enter new value to replace.' : 'Enter Render API key'}
+                    className="input-field pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRenderApiKey((prev) => !prev)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    aria-label={showRenderApiKey ? 'Hide Render API key input' : 'Show Render API key input'}
+                  >
+                    {showRenderApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDeploymentKey('render')}
+                  disabled={!hasRenderApiKey || removingRenderApiKey}
+                  className="px-3 py-2 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {removingRenderApiKey ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
+              {hasRenderApiKey && (
+                <p className="text-xs text-gray-500 mt-1">Saved key: ************</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Render Owner ID (optional)</label>
+              <input
+                type="text"
+                value={renderOwnerId}
+                onChange={(e) => setRenderOwnerId(e.target.value)}
+                placeholder="If empty, app tries auto-detection"
+                className="input-field"
+              />
+            </div>
+
+            <button
+              onClick={handleSaveDeploymentKeys}
+              disabled={savingDeployKeys}
+              className="btn-primary inline-flex items-center gap-2"
+            >
+              {savingDeployKeys ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{savingDeployKeys ? 'Saving...' : 'Save Deployment Keys'}</span>
+            </button>
+
+            <p className="text-xs text-gray-500">
+              Keys are never shown after saving. Use Remove to revoke stored keys.
+            </p>
+            <p className="text-xs text-white/60">
+              <span className='text-white gap-2'>Note: </span>We do not store users’ personal API keys or private identifiers in our database. All sensitive credentials remain securely managed by the user and are never persisted on our servers. Our system is designed to prioritize privacy and security by ensuring that no confidential key information is retained, logged, or exposed at any stage.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Account Deletion */}

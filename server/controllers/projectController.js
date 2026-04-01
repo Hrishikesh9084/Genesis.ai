@@ -25,7 +25,7 @@ const getModels = (req, res) => {
 const getProjects = async (req, res, next) => {
   try {
     const result = await db.query(
-      'SELECT id, name, prompt, stack, status, github_repo_url, deploy_url, deploy_platform, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY created_at DESC',
+      'SELECT id, name, prompt, stack, status, github_repo_url, deploy_url, deploy_frontend_url, deploy_backend_url, deploy_platform, created_at, updated_at FROM projects WHERE user_id = $1 ORDER BY created_at DESC',
       [req.user.id]
     );
     res.json({ projects: result.rows });

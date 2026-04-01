@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS users (
   password VARCHAR(255) NOT NULL,
   github_id VARCHAR(100) UNIQUE,
   github_token TEXT,
+  vercel_token TEXT,
+  render_api_key TEXT,
+  render_owner_id TEXT,
   credits INTEGER NOT NULL DEFAULT 0,
   avatar_url TEXT,
   email_verification_status VARCHAR(10) NOT NULL DEFAULT 'false',
@@ -29,6 +32,15 @@ ALTER TABLE IF EXISTS users
 ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE IF EXISTS users
+ADD COLUMN IF NOT EXISTS vercel_token TEXT;
+
+ALTER TABLE IF EXISTS users
+ADD COLUMN IF NOT EXISTS render_api_key TEXT;
+
+ALTER TABLE IF EXISTS users
+ADD COLUMN IF NOT EXISTS render_owner_id TEXT;
+
+ALTER TABLE IF EXISTS users
 ALTER COLUMN credits SET DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -42,6 +54,8 @@ CREATE TABLE IF NOT EXISTS projects (
   files JSONB DEFAULT '{}',
   github_repo_url TEXT,
   deploy_url TEXT,
+  deploy_frontend_url TEXT,
+  deploy_backend_url TEXT,
   deploy_platform VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -49,6 +63,12 @@ CREATE TABLE IF NOT EXISTS projects (
 
 ALTER TABLE IF EXISTS projects
 ADD COLUMN IF NOT EXISTS model VARCHAR(100) DEFAULT 'gemini-2.5-flash';
+
+ALTER TABLE IF EXISTS projects
+ADD COLUMN IF NOT EXISTS deploy_frontend_url TEXT;
+
+ALTER TABLE IF EXISTS projects
+ADD COLUMN IF NOT EXISTS deploy_backend_url TEXT;
 
 CREATE TABLE IF NOT EXISTS deployments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

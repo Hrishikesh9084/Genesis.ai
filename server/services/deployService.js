@@ -50,8 +50,15 @@ async function resolveRenderOwnerId(apiKey) {
   return ownerId;
 }
 
-const deployToVercel = async (project) => {
-  const token = process.env.VERCEL_TOKEN;
+async function resolveRenderOwnerIdWithOverride(apiKey, ownerIdOverride) {
+  if (ownerIdOverride) {
+    return ownerIdOverride;
+  }
+
+  return resolveRenderOwnerId(apiKey);
+}
+
+const deployFrontendToVercel = async (project, { token, backendUrl }) => {
   if (!token) throw new Error('Vercel token not configured.');
 
   const parsedFiles = typeof project.files === 'string' ? JSON.parse(project.files) : project.files;
@@ -68,13 +75,16 @@ const deployToVercel = async (project) => {
     .substring(0, 50);
 
   const deployPayload = {
-    name: projectName,
+    name: `${projectName}-web`,
     files: vercelFiles,
     projectSettings: {
       framework: 'vite',
       buildCommand: 'cd client && npm install && npm run build',
       outputDirectory: 'client/dist',
       installCommand: 'npm install',
+    },
+    env: {
+      ...(backendUrl ? { VITE_API_BASE_URL: `${backendUrl.replace(/\/+$/, '')}/api` } : {}),
     },
   };
 
@@ -98,11 +108,11 @@ const deployToVercel = async (project) => {
   return {
     url: `https://${response.data.url}`,
     deployId: response.data.id,
+    projectName: `${projectName}-web`,
   };
 };
 
-const deployToRender = async (project) => {
-  const apiKey = process.env.RENDER_API_KEY;
+const deployBackendToRender = async (project, { apiKey, ownerId, frontendUrl }) => {
   if (!apiKey) throw new Error('Render API key not configured.');
 
   if (!project.github_repo_url) {
@@ -115,12 +125,13 @@ const deployToRender = async (project) => {
     .replace(/-+/g, '-')
     .substring(0, 50);
 
-  const ownerId = await resolveRenderOwnerId(apiKey);
+  const resolvedOwnerId = await resolveRenderOwnerIdWithOverride(apiKey, ownerId);
+  const serviceName = `${projectName}-api`;
 
   const servicePayload = {
     type: 'web_service',
-    name: projectName,
-    ownerId,
+    name: serviceName,
+    ownerId: resolvedOwnerId,
     repo: project.github_repo_url,
     autoDeploy: 'yes',
     buildCommand: 'npm install',
@@ -128,6 +139,12 @@ const deployToRender = async (project) => {
     rootDir: 'server',
     envVars: [
       { key: 'NODE_ENV', value: 'production' },
+      ...(frontendUrl
+        ? [
+            { key: 'CLIENT_URL', value: frontendUrl },
+            { key: 'FRONTEND_URL', value: frontendUrl },
+          ]
+        : []),
     ],
     plan: 'free',
     env: 'node',
@@ -152,14 +169,45 @@ const deployToRender = async (project) => {
   }
 
   const service = response.data.service || response.data;
+  const serviceUrl = `https://${service.slug || serviceName}.onrender.com`;
 
   return {
-    url: `https://${service.slug || projectName}.onrender.com`,
+    url: serviceUrl,
     deployId: service.id,
+    serviceId: service.id,
+    serviceName,
   };
 };
 
+const updateRenderBackendEnv = async ({ apiKey, serviceId, frontendUrl }) => {
+  if (!frontendUrl) return;
+
+  const payload = [
+    { key: 'CLIENT_URL', value: frontendUrl },
+    { key: 'FRONTEND_URL', value: frontendUrl },
+  ];
+
+  const response = await httpsRequest(
+    {
+      hostname: 'api.render.com',
+      path: `/v1/services/${serviceId}/env-vars`,
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    },
+    payload
+  );
+
+  if (response.statusCode >= 400) {
+    throw new Error(`Render env update failed: ${JSON.stringify(response.data)}`);
+  }
+};
+
 export default {
-  deployToVercel,
-  deployToRender,
+  deployFrontendToVercel,
+  deployBackendToRender,
+  updateRenderBackendEnv,
 };

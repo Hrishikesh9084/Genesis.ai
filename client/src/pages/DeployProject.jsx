@@ -1,6 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Github, Rocket, Globe, ExternalLink, Loader2, Check, AlertCircle, Lock, Unlock } from 'lucide-react';
+import {
+  ArrowLeft,
+  Github,
+  Rocket,
+  Globe,
+  ExternalLink,
+  Loader2,
+  Check,
+  AlertCircle,
+  Lock,
+  Unlock,
+  Server,
+} from 'lucide-react';
 import api from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
@@ -18,8 +30,12 @@ export default function DeployProject() {
   const [pushingGithub, setPushingGithub] = useState(false);
 
   // Deploy state
-  const [platform, setPlatform] = useState('vercel');
+  const [target, setTarget] = useState('fullstack');
   const [deploying, setDeploying] = useState(false);
+  const [activeDeployCount, setActiveDeployCount] = useState(0);
+  const [keyStatusLoading, setKeyStatusLoading] = useState(true);
+  const [hasVercelToken, setHasVercelToken] = useState(false);
+  const [hasRenderApiKey, setHasRenderApiKey] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -35,10 +51,21 @@ export default function DeployProject() {
       setProject(proj);
       setRepoName(proj.name.toLowerCase().replace(/[^a-z0-9-]/g, '-'));
       setDeployments(deployRes.data.deployments);
-    } catch (err) {
+
+      try {
+        const keyRes = await api.get('/auth/deployment-keys');
+        const keys = keyRes.data?.keys || {};
+        setHasVercelToken(Boolean(keys.has_vercel_token));
+        setHasRenderApiKey(Boolean(keys.has_render_api_key));
+      } catch {
+        setHasVercelToken(false);
+        setHasRenderApiKey(false);
+      }
+    } catch {
       toast.error('Failed to load project');
       navigate('/dashboard');
     } finally {
+      setKeyStatusLoading(false);
       setLoading(false);
     }
   };
@@ -64,10 +91,15 @@ export default function DeployProject() {
   const handleDeploy = async () => {
     setDeploying(true);
     try {
-      const res = await api.post(`/deploy/${id}`, { platform });
-      setDeployments((prev) => [res.data.deployment, ...prev]);
-      toast.success(`Deployment to ${platform} started!`);
-      pollDeployment(res.data.deployment.id);
+      const res = await api.post(`/deploy/${id}`, { target });
+      const startedDeployments = res.data.deployments || [];
+      setDeployments((prev) => [...startedDeployments, ...prev]);
+      setActiveDeployCount(startedDeployments.length);
+      toast.success(`Deployment started for ${target}`);
+
+      startedDeployments.forEach((dep) => {
+        pollDeployment(dep.id);
+      });
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to deploy');
       setDeploying(false);
@@ -83,10 +115,25 @@ export default function DeployProject() {
 
         if (dep.status === 'deployed' || dep.status === 'failed') {
           clearInterval(interval);
-          setDeploying(false);
+          setActiveDeployCount((prev) => {
+            const next = Math.max(prev - 1, 0);
+            if (next === 0) {
+              setDeploying(false);
+            }
+            return next;
+          });
 
           if (dep.status === 'deployed') {
-            setProject((prev) => ({ ...prev, deploy_url: dep.url, deploy_platform: dep.platform }));
+            setProject((prev) => {
+              const isFrontend = dep.platform === 'vercel-frontend';
+              const isBackend = dep.platform === 'render-backend';
+              return {
+                ...prev,
+                deploy_url: prev.deploy_url || dep.url,
+                deploy_frontend_url: isFrontend ? dep.url : prev.deploy_frontend_url,
+                deploy_backend_url: isBackend ? dep.url : prev.deploy_backend_url,
+              };
+            });
             toast.success(`Deployed successfully! ${dep.url}`);
           } else {
             toast.error(dep.logs || 'Deployment failed');
@@ -95,12 +142,20 @@ export default function DeployProject() {
       } catch {
         clearInterval(interval);
         setDeploying(false);
+        setActiveDeployCount(0);
       }
     }, 5000);
   };
 
   if (loading) return <LoadingSpinner text="Loading deployment info..." />;
   if (!project) return null;
+
+  const needsGithub = target === 'backend' || target === 'fullstack';
+  const targetNeedsVercel = target === 'frontend' || target === 'fullstack';
+  const targetNeedsRender = target === 'backend' || target === 'fullstack';
+  const hasNeededKeys =
+    (!targetNeedsVercel || hasVercelToken) &&
+    (!targetNeedsRender || hasRenderApiKey);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -114,38 +169,113 @@ export default function DeployProject() {
         <p className="text-gray-400">Push to GitHub and deploy your project to the cloud.</p>
       </div>
 
-      {/* Live URL Banner */}
-      {project.deploy_url && (
-        <div className="card bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-green-800/50 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Globe className="w-6 h-6 text-green-400" />
-              <div>
-                <p className="text-sm font-medium text-green-300">Your project is live!</p>
-                <a
-                  href={project.deploy_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-green-400 hover:text-green-300 text-sm flex items-center space-x-1"
-                >
-                  <span>{project.deploy_url}</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+      <div className="card mb-6">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="text-base font-semibold">Connected Keys Check</h2>
+          <Link to="/settings" className="text-xs text-orange-400 hover:text-orange-300">
+            Manage in Settings
+          </Link>
+        </div>
+
+        {keyStatusLoading ? (
+          <p className="text-sm text-gray-500">Checking key status...</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3 text-sm">
+              <div className="flex items-center justify-between rounded-lg bg-gray-800 p-3">
+                <span className="text-gray-300">Vercel Token</span>
+                <span className={`text-xs px-2 py-1 rounded ${hasVercelToken ? 'bg-green-900/40 text-green-300' : 'bg-red-900/30 text-red-300'}`}>
+                  {hasVercelToken ? 'Connected' : 'Missing'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg bg-gray-800 p-3">
+                <span className="text-gray-300">Render API Key</span>
+                <span className={`text-xs px-2 py-1 rounded ${hasRenderApiKey ? 'bg-green-900/40 text-green-300' : 'bg-red-900/30 text-red-300'}`}>
+                  {hasRenderApiKey ? 'Connected' : 'Missing'}
+                </span>
               </div>
             </div>
-            <a
-              href={project.deploy_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary text-sm py-1.5 px-3"
-            >
-              Visit
-            </a>
+
+            {!hasNeededKeys && (
+              <div className="flex items-start space-x-2 rounded-lg border border-yellow-800/40 bg-yellow-900/20 p-3 text-yellow-300 text-sm">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  Missing required deployment keys for the selected target.
+                  {targetNeedsVercel && !hasVercelToken ? ' Add Vercel token.' : ''}
+                  {targetNeedsRender && !hasRenderApiKey ? ' Add Render API key.' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {(project.deploy_frontend_url || project.deploy_backend_url || project.deploy_url) && (
+        <div className="card bg-linear-to-r from-green-900/30 to-emerald-900/30 border-green-800/50 mb-6">
+          <p className="text-sm font-medium text-green-300 mb-3">Deployment URLs</p>
+
+          <div className="space-y-2">
+            {project.deploy_frontend_url && (
+              <div className="p-2 rounded bg-black/20 flex items-center justify-between gap-3">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <Globe className="w-5 h-5 text-green-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-green-200">Frontend</p>
+                    <a
+                      href={project.deploy_frontend_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-300 hover:text-green-200 text-sm flex items-center gap-1"
+                    >
+                      <span className="truncate">{project.deploy_frontend_url}</span>
+                      <ExternalLink className="w-3 h-3 shrink-0" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {project.deploy_backend_url && (
+              <div className="p-2 rounded bg-black/20 flex items-center justify-between gap-3">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <Server className="w-5 h-5 text-green-400 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs text-green-200">Backend</p>
+                    <a
+                      href={project.deploy_backend_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-300 hover:text-green-200 text-sm flex items-center gap-1"
+                    >
+                      <span className="truncate">{project.deploy_backend_url}</span>
+                      <ExternalLink className="w-3 h-3 shrink-0" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!project.deploy_frontend_url && !project.deploy_backend_url && project.deploy_url && (
+              <div className="p-2 rounded bg-black/20 flex items-center justify-between gap-3">
+                <div className="flex items-center space-x-2 min-w-0">
+                  <Globe className="w-5 h-5 text-green-400 shrink-0" />
+                  <a
+                    href={project.deploy_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-green-300 hover:text-green-200 text-sm flex items-center gap-1"
+                  >
+                    <span className="truncate">{project.deploy_url}</span>
+                    <ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Step 1: Push to GitHub */}
       <div className="card mb-6">
         <div className="flex items-center space-x-3 mb-4">
           <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center text-sm font-bold">1</div>
@@ -218,55 +348,72 @@ export default function DeployProject() {
         )}
       </div>
 
-      {/* Step 2: Deploy */}
       <div className="card mb-6">
         <div className="flex items-center space-x-3 mb-4">
           <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center text-sm font-bold">2</div>
           <div>
             <h2 className="text-lg font-semibold flex items-center space-x-2">
               <Rocket className="w-5 h-5" />
-              <span>Deploy to Cloud</span>
+              <span>Deploy</span>
             </h2>
-            <p className="text-gray-400 text-sm">Deploy your project and get a live URL</p>
+            <p className="text-gray-400 text-sm">Deploy frontend, backend, or both with URL sync</p>
           </div>
         </div>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-3 gap-3">
             <button
-              onClick={() => setPlatform('vercel')}
+              onClick={() => setTarget('frontend')}
               className={`p-4 rounded-lg border-2 transition-all ${
-                platform === 'vercel'
+                target === 'frontend'
                   ? 'border-orange-500 bg-orange-500/10'
                   : 'border-gray-700 bg-gray-800 hover:border-gray-600'
               }`}
             >
-              <div className="text-lg font-bold mb-1">Vercel</div>
-              <p className="text-xs text-gray-400">Best for frontend & serverless</p>
+              <div className="text-lg font-bold mb-1">Frontend</div>
+              <p className="text-xs text-gray-400">Deploy client to Vercel</p>
             </button>
             <button
-              onClick={() => setPlatform('render')}
+              onClick={() => setTarget('backend')}
               className={`p-4 rounded-lg border-2 transition-all ${
-                platform === 'render'
+                target === 'backend'
                   ? 'border-orange-500 bg-orange-500/10'
                   : 'border-gray-700 bg-gray-800 hover:border-gray-600'
               }`}
             >
-              <div className="text-lg font-bold mb-1">Render</div>
-              <p className="text-xs text-gray-400">Best for full-stack & databases</p>
+              <div className="text-lg font-bold mb-1">Backend</div>
+              <p className="text-xs text-gray-400">Deploy server to Render</p>
+            </button>
+            <button
+              onClick={() => setTarget('fullstack')}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                target === 'fullstack'
+                  ? 'border-orange-500 bg-orange-500/10'
+                  : 'border-gray-700 bg-gray-800 hover:border-gray-600'
+              }`}
+            >
+              <div className="text-lg font-bold mb-1">Fullstack</div>
+              <p className="text-xs text-gray-400">Deploy both + sync URLs</p>
             </button>
           </div>
 
-          {!project.github_repo_url && (
+          {needsGithub && !project.github_repo_url && (
             <div className="flex items-center space-x-2 p-3 bg-yellow-900/20 border border-yellow-800/30 rounded-lg text-yellow-400 text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>Push to GitHub first to deploy on {platform === 'vercel' ? 'Vercel' : 'Render'}.</span>
+              <span>Push to GitHub first to deploy backend on Render.</span>
+            </div>
+          )}
+
+          {target === 'fullstack' && (
+            <div className="text-xs text-gray-400 p-3 rounded-lg bg-gray-900/60 border border-gray-800">
+              Fullstack flow: backend deploys first on Render, frontend deploys on Vercel with backend URL,
+              then backend environment is updated with the frontend URL.
             </div>
           )}
 
           <button
             onClick={handleDeploy}
-            disabled={deploying || !project.github_repo_url}
+            disabled={deploying || (needsGithub && !project.github_repo_url) || !hasNeededKeys}
             className="btn-primary w-full flex items-center justify-center space-x-2"
           >
             {deploying ? (
@@ -277,14 +424,17 @@ export default function DeployProject() {
             ) : (
               <>
                 <Rocket className="w-5 h-5" />
-                <span>Deploy to {platform === 'vercel' ? 'Vercel' : 'Render'}</span>
+                <span>
+                  {target === 'frontend' && 'Deploy Frontend (Vercel)'}
+                  {target === 'backend' && 'Deploy Backend (Render)'}
+                  {target === 'fullstack' && 'Deploy Fullstack'}
+                </span>
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* Deployment History */}
       {deployments.length > 0 && (
         <div className="card">
           <h3 className="text-lg font-semibold mb-4">Deployment History</h3>
@@ -299,7 +449,7 @@ export default function DeployProject() {
                       'bg-red-400'
                     }`} />
                     <div>
-                      <p className="text-sm font-medium capitalize">{dep.platform}</p>
+                      <p className="text-sm font-medium capitalize">{dep.platform.replace('-', ' ')}</p>
                       <p className="text-xs text-gray-500">{new Date(dep.created_at).toLocaleString()}</p>
                     </div>
                   </div>

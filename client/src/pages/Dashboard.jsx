@@ -40,7 +40,7 @@ export default function Dashboard() {
   if (loading) return <LoadingSpinner text="Loading your projects..." />;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto mt-24 pb-18">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold">Your Projects</h1>

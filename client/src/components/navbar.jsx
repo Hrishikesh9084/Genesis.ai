@@ -241,7 +241,7 @@ export default function Navbar() {
             {link.name}
           </Link>
         ))}
-          |
+            
         {!user && (
           <Link to="/register" className="btn bg-linear-to-r from-orange-500 to-orange-600 border-0" onClick={() => setIsOpen(false)}>
             Sign Up
