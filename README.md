@@ -4,7 +4,7 @@ Genesis AI is an AI-powered full-stack platform that helps users generate, edit,
 
 The project is designed to streamline the path from idea to working application by combining intelligent code generation, project management, and deployment workflows in one developer-focused product.
 
-## Developer
+## Developer Info :- 
 
 ![Hrishikesh Chaudhari](./client//public/assets/IMG_20250929_140502_465.jpg)
 
