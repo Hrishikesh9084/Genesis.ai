@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Github, Key, Save, Loader2, User, Upload } from 'lucide-react';
+import { Github, Key, Save, Loader2, User, Upload, AlertTriangle, Trash2, LogOut, DeleteIcon } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 export default function Settings() {
-  const { user, updateProfile, uploadProfileImage } = useAuth();
+  const { user, updateProfile, uploadProfileImage, deleteAccount, logout } = useAuth();
+  const navigate = useNavigate();
   const [githubToken, setGithubToken] = useState('');
   const [saving, setSaving] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profileImage, setProfileImage] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     setProfileName(user?.name || '');
@@ -93,12 +97,38 @@ export default function Settings() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') {
+      toast.error('Type DELETE to confirm account deletion.');
+      return;
+    }
+
+    const confirmed = window.confirm('Are you sure you want to permanently delete your account? This action cannot be undone.');
+    if (!confirmed) return;
+
+    setDeletingAccount(true);
+    try {
+      await deleteAccount();
+      toast.success('Account deleted successfully.');
+      navigate('/register', { replace: true });
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete account.');
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Settings</h1>
 
       {/* Profile */}
-      <div className="card mb-6 p-2">
+      <div className="card mb-6 p-8 py-5">
         <div className="flex items-center space-x-3 mb-4">
           <User className="w-5 h-5 text-orange-400" />
           <h2 className="text-lg font-semibold">Profile</h2>
@@ -236,6 +266,47 @@ export default function Settings() {
             <span className="text-xs px-2 py-1 bg-gray-700 rounded text-gray-400">Server-side</span>
           </div>
         </div>
+      </div>
+
+      {/* Account Deletion */}
+      <div className="card mt-6 border border-red-500/30">
+      <div className="flex items-center space-x-3 mb-4">
+          <LogOut className="w-5 h-5 text-red-400" />
+          <h2 className="text-lg font-semibold text-red-300">Account Logout</h2>
+        </div>
+        <p className="text-sm text-gray-400 mb-4">
+          You can log out of your account here. Logging out will require you to log in again to access your projects and settings.
+        </p>
+       <button
+          onClick={handleLogout}
+          className="mb-4 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-gray-200 "
+        >
+          <span className='inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70'>Logout</span>
+        </button>
+        <div className="flex items-center space-x-3 mb-4">
+          <DeleteIcon className="w-5 h-5 text-red-400" />
+          <h2 className="text-lg font-semibold text-red-300">Account Deletion</h2>
+        </div>
+        <p className="text-sm text-gray-400 mb-4">
+          Deleting your account will permanently remove your profile and all linked projects. This action cannot be undone.
+        </p>
+        <label htmlFor="delete-confirm" className="block text-sm text-gray-400 mb-1">Type <span className="text-red-300 font-semibold">DELETE</span> to confirm</label>
+        <input
+          id="delete-confirm"
+          type="text"
+          value={deleteConfirmText}
+          onChange={(e) => setDeleteConfirmText(e.target.value)}
+          className="input-field mb-3"
+          placeholder="DELETE"
+        />
+        <button
+          onClick={handleDeleteAccount}
+          disabled={deletingAccount}
+          className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {deletingAccount ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          <span>{deletingAccount ? 'Deleting Account...' : 'Delete Account'}</span>
+        </button>
       </div>
     </div>
   );

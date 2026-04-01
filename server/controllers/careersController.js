@@ -588,20 +588,70 @@ const getApplicationStatus = async (req, res, next) => {
 
 const updateApplicationStatus = async (req, res, next) => {
   try {
+    const applicationId = req.params.id;
     const status = String(req.body?.status || '').trim().toLowerCase();
-    const result = await db.query(
-      `UPDATE job_applications
-       SET status = $1, updated_at = NOW()
-       WHERE id = $2
-       RETURNING id, status, updated_at`,
-      [status, req.params.id]
+
+    const appResult = await db.query(
+      `SELECT id, email, full_name, role_title, status
+       FROM job_applications
+       WHERE id = $1`,
+      [applicationId]
     );
 
-    if (result.rows.length === 0) {
+    if (appResult.rows.length === 0) {
       return res.status(404).json({ error: 'Application not found.' });
     }
 
-    return res.json({ application: result.rows[0] });
+    const application = appResult.rows[0];
+    const oldStatus = application.status;
+
+    const updateResult = await db.query(
+      `UPDATE job_applications
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING id, status, email, full_name, role_title, updated_at`,
+      [status, applicationId]
+    );
+
+    const updatedApp = updateResult.rows[0];
+
+    if (emailService.isEmailConfigured() && updatedApp.email && oldStatus !== status) {
+      const candidateEmail = updatedApp.email;
+      const candidateName = updatedApp.full_name || 'Candidate';
+      const roleTitle = updatedApp.role_title || 'the role';
+
+      const statusTriggers = ['hired', 'shortlisted', 'rejected'];
+      if (statusTriggers.includes(status)) {
+        try {
+          if (status === 'hired') {
+            await emailService.sendHiredNotificationEmail({
+              to: candidateEmail,
+              name: candidateName,
+              roleTitle,
+              applicationId,
+            });
+          } else if (status === 'shortlisted') {
+            await emailService.sendShortlistedNotificationEmail({
+              to: candidateEmail,
+              name: candidateName,
+              roleTitle,
+              applicationId,
+            });
+          } else if (status === 'rejected') {
+            await emailService.sendRejectionNotificationEmail({
+              to: candidateEmail,
+              name: candidateName,
+              roleTitle,
+              applicationId,
+            });
+          }
+        } catch (mailErr) {
+          console.error('Careers status notification email failed:', mailErr.message);
+        }
+      }
+    }
+
+    return res.json({ application: updatedApp });
   } catch (err) {
     return next(err);
   }
@@ -705,6 +755,98 @@ const deleteJobRole = async (req, res, next) => {
   }
 };
 
+const updateJobRole = async (req, res, next) => {
+  try {
+    await ensureJobRolesTable();
+
+    const roleId = req.params.id;
+    const title = req.body?.title !== undefined ? String(req.body.title).trim() : null;
+    const department = req.body?.department !== undefined ? String(req.body.department).trim() : null;
+    const location = req.body?.location !== undefined ? String(req.body.location).trim() : null;
+    const type = req.body?.type !== undefined ? String(req.body.type).trim() : null;
+    const summary = req.body?.summary !== undefined ? String(req.body.summary).trim() : null;
+    const requirements = req.body?.requirements !== undefined ? normalizeRoleRequirements(req.body.requirements) : null;
+    const isActive = req.body?.isActive !== undefined ? Boolean(req.body.isActive) : null;
+
+    const updates = [];
+    const values = [roleId];
+    let paramIndex = 2;
+
+    if (title !== null) {
+      updates.push(`title = $${paramIndex}`);
+      values.push(title);
+      paramIndex++;
+    }
+    if (department !== null) {
+      updates.push(`department = $${paramIndex}`);
+      values.push(department);
+      paramIndex++;
+    }
+    if (location !== null) {
+      updates.push(`location = $${paramIndex}`);
+      values.push(location);
+      paramIndex++;
+    }
+    if (type !== null) {
+      updates.push(`type = $${paramIndex}`);
+      values.push(type);
+      paramIndex++;
+    }
+    if (summary !== null) {
+      updates.push(`summary = $${paramIndex}`);
+      values.push(summary);
+      paramIndex++;
+    }
+    if (requirements !== null) {
+      updates.push(`requirements = $${paramIndex}::jsonb`);
+      values.push(JSON.stringify(requirements));
+      paramIndex++;
+    }
+    if (isActive !== null) {
+      updates.push(`is_active = $${paramIndex}`);
+      values.push(isActive);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'At least one field must be provided for update.' });
+    }
+
+    updates.push('updated_at = NOW()');
+
+    const result = await db.query(
+      `UPDATE job_roles
+       SET ${updates.join(', ')}
+       WHERE id = $1
+       RETURNING
+         id,
+         title,
+         department,
+         location,
+         type,
+         summary,
+         requirements,
+         is_active,
+         created_at,
+         updated_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Job role not found.' });
+    }
+
+    invalidateJobsCache();
+
+    return res.json({
+      role: sanitizeRoleRecord(result.rows[0]),
+      message: 'Job role updated successfully.',
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const downloadApplicationResume = async (req, res, next) => {
   try {
     const result = await db.query(
@@ -749,6 +891,7 @@ export default {
   applyForJob,
   listJobRoles,
   createJobRole,
+  updateJobRole,
   deleteJobRole,
   listApplications,
   getApplicationStatus,

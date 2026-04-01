@@ -9,11 +9,10 @@ import { Toaster } from "react-hot-toast";
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <AuthProvider>
-    <Toaster position="top-center" toastOptions={{
+    <Toaster position="top-right" toastOptions={{
         style:{
-            background: '#1a1a2e',
-            color: '#fff',
-            border: '1px solid rgba(251, 146, 60, 0.2)',
+            background: '#fff',
+            color: '#000',
         }
     }} />
       <App />

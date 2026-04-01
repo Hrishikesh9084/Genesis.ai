@@ -44,6 +44,12 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const refreshUser = async () => {
+    const res = await api.get('/auth/me');
+    setUser(res.data.user);
+    return res.data.user;
+  };
+
   const updateProfile = async (payload) => {
     const res = await api.put('/auth/profile', payload);
     setUser(res.data.user);
@@ -69,8 +75,14 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const deleteAccount = async () => {
+    await api.delete('/auth/account');
+    localStorage.removeItem('genesis_token');
+    setUser(null);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, loginWithToken, updateProfile, uploadProfileImage, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, loginWithToken, refreshUser, updateProfile, uploadProfileImage, logout, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

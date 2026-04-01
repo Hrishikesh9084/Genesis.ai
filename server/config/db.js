@@ -39,6 +39,12 @@ const schemaReady = pool
      ALTER TABLE IF EXISTS users
      ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP;
 
+    ALTER TABLE IF EXISTS users
+    ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0;
+
+    ALTER TABLE IF EXISTS users
+    ALTER COLUMN credits SET DEFAULT 0;
+
      CREATE TABLE IF NOT EXISTS job_applications (
        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
        role_id VARCHAR(120) NOT NULL,
@@ -86,7 +92,26 @@ const schemaReady = pool
      CREATE INDEX IF NOT EXISTS idx_job_applications_email ON job_applications(email);
      CREATE INDEX IF NOT EXISTS idx_job_applications_role_id ON job_applications(role_id);
      CREATE INDEX IF NOT EXISTS idx_job_applications_status ON job_applications(status);
-     CREATE INDEX IF NOT EXISTS idx_job_applications_created_at ON job_applications(created_at DESC);`
+     CREATE INDEX IF NOT EXISTS idx_job_applications_created_at ON job_applications(created_at DESC);
+
+     CREATE TABLE IF NOT EXISTS credit_transactions (
+       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+       user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+       plan_id VARCHAR(60) NOT NULL,
+       credits INTEGER NOT NULL,
+       amount_paise INTEGER NOT NULL,
+       currency VARCHAR(10) NOT NULL DEFAULT 'INR',
+       razorpay_order_id VARCHAR(120) UNIQUE,
+       razorpay_payment_id VARCHAR(120),
+       razorpay_signature VARCHAR(255),
+       status VARCHAR(30) NOT NULL DEFAULT 'created',
+       metadata JSONB NOT NULL DEFAULT '{}',
+       created_at TIMESTAMP DEFAULT NOW(),
+       updated_at TIMESTAMP DEFAULT NOW()
+     );
+
+     CREATE INDEX IF NOT EXISTS idx_credit_tx_user_id ON credit_transactions(user_id);
+     CREATE INDEX IF NOT EXISTS idx_credit_tx_status ON credit_transactions(status);`
   )
   .catch((err) => {
     console.error('Schema migration failed:', err.message);

@@ -31,6 +31,7 @@ router.post('/status', statusLookupLimiter, validators.validateApplicationStatus
 router.use('/admin', authenticate, requireAdmin);
 router.get('/admin/jobs', careersController.listJobRoles);
 router.post('/admin/jobs', validators.validateAdminCreateJobRole, careersController.createJobRole);
+router.put('/admin/jobs/:id', validators.validateJobRoleIdParam, validators.validateAdminUpdateJobRole, careersController.updateJobRole);
 router.delete('/admin/jobs/:id', validators.validateJobRoleIdParam, careersController.deleteJobRole);
 router.get('/admin/applications', careersController.listApplications);
 router.patch(

@@ -438,6 +438,72 @@ function validateJobRoleIdParam(req, res, next) {
   next();
 }
 
+function validateAdminUpdateJobRole(req, res, next) {
+  const { title, department, location, type, summary, requirements, isActive } = req.body || {};
+
+  if (
+    title === undefined &&
+    department === undefined &&
+    location === undefined &&
+    type === undefined &&
+    summary === undefined &&
+    requirements === undefined &&
+    isActive === undefined
+  ) {
+    return badRequest(res, 'At least one field (title, department, location, type, summary, requirements, or isActive) must be provided.');
+  }
+
+  if (title !== undefined && !String(title).trim()) {
+    return badRequest(res, 'title cannot be empty.');
+  }
+
+  if (department !== undefined && !String(department).trim()) {
+    return badRequest(res, 'department cannot be empty.');
+  }
+
+  if (location !== undefined && !String(location).trim()) {
+    return badRequest(res, 'location cannot be empty.');
+  }
+
+  if (type !== undefined && !String(type).trim()) {
+    return badRequest(res, 'type cannot be empty.');
+  }
+
+  if (summary !== undefined && !String(summary).trim()) {
+    return badRequest(res, 'summary cannot be empty.');
+  }
+
+  if (summary !== undefined && String(summary).length > 1200) {
+    return badRequest(res, 'summary must be 1200 characters or fewer.');
+  }
+
+  if (requirements !== undefined) {
+    if (!Array.isArray(requirements) || requirements.length === 0) {
+      return badRequest(res, 'requirements must be a non-empty array.');
+    }
+
+    if (requirements.length > 20) {
+      return badRequest(res, 'requirements must have at most 20 items.');
+    }
+
+    for (const requirement of requirements) {
+      if (!String(requirement || '').trim()) {
+        return badRequest(res, 'requirements must contain non-empty strings.');
+      }
+
+      if (String(requirement).length > 300) {
+        return badRequest(res, 'each requirement must be 300 characters or fewer.');
+      }
+    }
+  }
+
+  if (isActive !== undefined && typeof isActive !== 'boolean') {
+    return badRequest(res, 'isActive must be a boolean.');
+  }
+
+  next();
+}
+
 export default {
   validateRegister,
   validateLogin,
@@ -460,4 +526,5 @@ export default {
   validateApplicationStatusLookup,
   validateAdminCreateJobRole,
   validateJobRoleIdParam,
+  validateAdminUpdateJobRole,
 };

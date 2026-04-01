@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   password VARCHAR(255) NOT NULL,
   github_id VARCHAR(100) UNIQUE,
   github_token TEXT,
+  credits INTEGER NOT NULL DEFAULT 0,
   avatar_url TEXT,
   email_verification_status VARCHAR(10) NOT NULL DEFAULT 'false',
   email_verification_error TEXT,
@@ -23,6 +24,12 @@ ADD COLUMN IF NOT EXISTS email_verification_status VARCHAR(10) NOT NULL DEFAULT 
 
 ALTER TABLE IF EXISTS users
 ADD COLUMN IF NOT EXISTS email_verification_error TEXT;
+
+ALTER TABLE IF EXISTS users
+ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE IF EXISTS users
+ALTER COLUMN credits SET DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -91,6 +98,22 @@ CREATE TABLE IF NOT EXISTS job_roles (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS credit_transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  plan_id VARCHAR(60) NOT NULL,
+  credits INTEGER NOT NULL,
+  amount_paise INTEGER NOT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'INR',
+  razorpay_order_id VARCHAR(120) UNIQUE,
+  razorpay_payment_id VARCHAR(120),
+  razorpay_signature VARCHAR(255),
+  status VARCHAR(30) NOT NULL DEFAULT 'created',
+  metadata JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_deployments_project_id ON deployments(project_id);
 CREATE INDEX IF NOT EXISTS idx_job_applications_email ON job_applications(email);
@@ -98,3 +121,5 @@ CREATE INDEX IF NOT EXISTS idx_job_applications_role_id ON job_applications(role
 CREATE INDEX IF NOT EXISTS idx_job_applications_status ON job_applications(status);
 CREATE INDEX IF NOT EXISTS idx_job_applications_created_at ON job_applications(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_job_roles_is_active ON job_roles(is_active);
+CREATE INDEX IF NOT EXISTS idx_credit_tx_user_id ON credit_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_credit_tx_status ON credit_transactions(status);

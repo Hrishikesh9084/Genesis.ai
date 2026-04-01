@@ -24,6 +24,7 @@
     "octokit": "^4.0.2",
     "openai": "^6.33.0",
     "pg": "^8.13.0",
+    "razorpay": "^2.9.6",
     "uuid": "^10.0.0"
   },
   "devDependencies": {

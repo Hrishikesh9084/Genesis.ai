@@ -21,6 +21,9 @@ export default function AdminApplications() {
   const [rolesLoading, setRolesLoading] = useState(true);
   const [creatingRole, setCreatingRole] = useState(false);
   const [deletingRoleId, setDeletingRoleId] = useState("");
+  const [editingRole, setEditingRole] = useState(null);
+  const [editingRoleData, setEditingRoleData] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [roleMessage, setRoleMessage] = useState("");
   const [updatingId, setUpdatingId] = useState("");
@@ -193,6 +196,63 @@ export default function AdminApplications() {
     }
   };
 
+  const handleStartEditRole = (role) => {
+    setEditingRole(role);
+    setEditingRoleData({
+      title: role.title,
+      department: role.department,
+      location: role.location,
+      type: role.type,
+      summary: role.summary,
+      requirementsText: (role.requirements || []).join("\n"),
+      isActive: role.isActive,
+    });
+    setRoleMessage("");
+  };
+
+  const handleEditRoleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setEditingRoleData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const handleSaveEditRole = async () => {
+    if (!editingRole?.id) return;
+
+    setSavingEdit(true);
+    setErrorMessage("");
+    setRoleMessage("");
+
+    try {
+      const requirements = editingRoleData.requirementsText
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      const payload = {
+        title: editingRoleData.title.trim(),
+        department: editingRoleData.department.trim(),
+        location: editingRoleData.location.trim(),
+        type: editingRoleData.type.trim(),
+        summary: editingRoleData.summary.trim(),
+        requirements,
+        isActive: editingRoleData.isActive,
+      };
+
+      await api.put(`/careers/admin/jobs/${editingRole.id}`, payload);
+      setRoleMessage("Job role updated successfully.");
+      setEditingRole(null);
+      setEditingRoleData(null);
+      await loadRoles();
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || "Failed to update job role.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const handleResumeDownload = async (application) => {
     try {
       const response = await api.get(`/careers/admin/applications/${application.id}/resume`, {
@@ -224,8 +284,8 @@ export default function AdminApplications() {
         </p>
 
         <div className="mt-6 rounded-xl border border-white/10 bg-white/3 p-4 sm:p-5">
-          <h2 className="text-lg font-semibold text-white">Add Job Role</h2>
-          <p className="mt-1 text-sm text-slate-300">Create a new careers role visible on public openings and application form.</p>
+          <h2 className="text-lg font-semibold text-white">{editingRole ? "Edit Job Role" : "Add Job Role"}</h2>
+          <p className="mt-1 text-sm text-slate-300">{editingRole ? "Update the role details below." : "Create a new careers role visible on public openings and application form."}</p>
 
           {roleMessage && (
             <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
@@ -233,50 +293,98 @@ export default function AdminApplications() {
             </div>
           )}
 
-          <form className="mt-4 space-y-3" onSubmit={handleCreateRole}>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <input className="input-field" name="title" value={roleForm.title} onChange={handleRoleFormChange} placeholder="Role title" required />
-              <input className="input-field" name="department" value={roleForm.department} onChange={handleRoleFormChange} placeholder="Department" required />
-              <input className="input-field" name="location" value={roleForm.location} onChange={handleRoleFormChange} placeholder="Location" required />
-              <input className="input-field" name="type" value={roleForm.type} onChange={handleRoleFormChange} placeholder="Employment type" required />
-              <input className="input-field" name="id" value={roleForm.id} onChange={handleRoleFormChange} placeholder="Role ID (optional)" />
-              <label className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-300">
-                <input type="checkbox" name="isActive" checked={roleForm.isActive} onChange={handleRoleFormChange} />
-                Active
-              </label>
-            </div>
+          {!editingRole ? (
+            <form className="mt-4 space-y-3" onSubmit={handleCreateRole}>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <input className="input-field" name="title" value={roleForm.title} onChange={handleRoleFormChange} placeholder="Role title" required />
+                <input className="input-field" name="department" value={roleForm.department} onChange={handleRoleFormChange} placeholder="Department" required />
+                <input className="input-field" name="location" value={roleForm.location} onChange={handleRoleFormChange} placeholder="Location" required />
+                <input className="input-field" name="type" value={roleForm.type} onChange={handleRoleFormChange} placeholder="Employment type" required />
+                <input className="input-field" name="id" value={roleForm.id} onChange={handleRoleFormChange} placeholder="Role ID (optional)" />
+                <label className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-300">
+                  <input type="checkbox" name="isActive" checked={roleForm.isActive} onChange={handleRoleFormChange} />
+                  Active
+                </label>
+              </div>
 
-            <textarea
-              className="input-field min-h-24 resize-y"
-              name="summary"
-              value={roleForm.summary}
-              onChange={handleRoleFormChange}
-              placeholder="Role summary"
-              required
-            />
-            <textarea
-              className="input-field min-h-28 resize-y"
-              name="requirementsText"
-              value={roleForm.requirementsText}
-              onChange={handleRoleFormChange}
-              placeholder="Requirements (one per line)"
-              required
-            />
+              <textarea
+                className="input-field min-h-24 resize-y"
+                name="summary"
+                value={roleForm.summary}
+                onChange={handleRoleFormChange}
+                placeholder="Role summary"
+                required
+              />
+              <textarea
+                className="input-field min-h-28 resize-y"
+                name="requirementsText"
+                value={roleForm.requirementsText}
+                onChange={handleRoleFormChange}
+                placeholder="Requirements (one per line)"
+                required
+              />
 
-            <button type="submit" className="btn-primary rounded-lg px-4 py-2" disabled={creatingRole}>
-              {creatingRole ? "Adding role..." : "Add Role"}
-            </button>
-          </form>
+              <button type="submit" className="btn-primary rounded-lg px-4 py-2" disabled={creatingRole}>
+                {creatingRole ? "Adding role..." : "Add Role"}
+              </button>
+            </form>
+          ) : (
+            <form className="mt-4 space-y-3" onSubmit={(e) => { e.preventDefault(); handleSaveEditRole(); }}>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <input className="input-field" name="title" value={editingRoleData?.title} onChange={handleEditRoleChange} placeholder="Role title" required />
+                <input className="input-field" name="department" value={editingRoleData?.department} onChange={handleEditRoleChange} placeholder="Department" required />
+                <input className="input-field" name="location" value={editingRoleData?.location} onChange={handleEditRoleChange} placeholder="Location" required />
+                <input className="input-field" name="type" value={editingRoleData?.type} onChange={handleEditRoleChange} placeholder="Employment type" required />
+                <label className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-sm text-slate-300">
+                  <input type="checkbox" name="isActive" checked={editingRoleData?.isActive} onChange={handleEditRoleChange} />
+                  Active
+                </label>
+              </div>
+
+              <textarea
+                className="input-field min-h-24 resize-y"
+                name="summary"
+                value={editingRoleData?.summary}
+                onChange={handleEditRoleChange}
+                placeholder="Role summary"
+                required
+              />
+              <textarea
+                className="input-field min-h-28 resize-y"
+                name="requirementsText"
+                value={editingRoleData?.requirementsText}
+                onChange={handleEditRoleChange}
+                placeholder="Requirements (one per line)"
+                required
+              />
+
+              <div className="flex gap-2">
+                <button type="submit" className="btn-primary rounded-lg px-4 py-2" disabled={savingEdit}>
+                  {savingEdit ? "Saving..." : "Save Changes"}
+                </button>
+                <button type="button" className="btn-secondary rounded-lg px-4 py-2" onClick={() => { setEditingRole(null); setEditingRoleData(null); }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
 
           <div className="mt-5">
             <p className="text-xs uppercase tracking-wide text-slate-400">Existing Roles</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {rolesLoading && <span className="text-sm text-slate-400">Loading roles...</span>}
-              {!rolesLoading && roleOptions.length === 0 && <span className="text-sm text-slate-400">No roles found.</span>}
+              {!rolesLoading && roles.length === 0 && <span className="text-sm text-slate-400">No roles found.</span>}
               {!rolesLoading && roles.map((role) => (
                 <div key={role.id} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-300">
                   <span>{role.title}</span>
                   {!role.isActive && <span className="text-[10px] uppercase text-slate-400">inactive</span>}
+                  <button
+                    type="button"
+                    onClick={() => handleStartEditRole(role)}
+                    className="rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] uppercase text-blue-300 hover:bg-blue-500/20"
+                  >
+                    Edit
+                  </button>
                   {role.isActive && (
                     <button
                       type="button"

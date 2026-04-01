@@ -2,6 +2,19 @@ import db from '../config/db.js';
 import aiGenerator from '../services/aiGenerator.js';
 import githubService from '../services/githubService.js';
 
+async function consumeOneCredit(userId) {
+  const result = await db.query(
+    `UPDATE users
+     SET credits = credits - 1,
+         updated_at = NOW()
+     WHERE id = $1 AND credits > 0
+     RETURNING credits`,
+    [userId]
+  );
+
+  return result.rows[0] || null;
+}
+
 const getModels = (req, res) => {
   res.json({
     providers: aiGenerator.getAvailableModels(),
@@ -48,6 +61,13 @@ const createProject = async (req, res, next) => {
 
     const selectedModel = model || aiGenerator.DEFAULT_MODEL;
 
+    const creditResult = await consumeOneCredit(req.user.id);
+    if (!creditResult) {
+      return res.status(402).json({
+        error: 'Insufficient credits. Please purchase a plan before generating projects.',
+      });
+    }
+
     const result = await db.query(
       'INSERT INTO projects (user_id, name, prompt, stack, model, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
       [req.user.id, name, prompt, stack || 'nextjs-express', selectedModel, 'generating']
@@ -57,7 +77,7 @@ const createProject = async (req, res, next) => {
 
     generateProjectAsync(project.id, prompt, stack || 'nextjs-express', selectedModel);
 
-    res.status(201).json({ project });
+    res.status(201).json({ project, creditsRemaining: Number(creditResult.credits || 0) });
   } catch (err) {
     next(err);
   }
@@ -98,6 +118,13 @@ const editProject = async (req, res, next) => {
     const project = result.rows[0];
     const selectedModel = model || project.model || aiGenerator.DEFAULT_MODEL;
 
+    const creditResult = await consumeOneCredit(req.user.id);
+    if (!creditResult) {
+      return res.status(402).json({
+        error: 'Insufficient credits. Please purchase a plan before regenerating projects.',
+      });
+    }
+
     await db.query('UPDATE projects SET status = $1, model = $2, updated_at = NOW() WHERE id = $3', [
       'generating',
       selectedModel,
@@ -106,7 +133,7 @@ const editProject = async (req, res, next) => {
 
     editProjectAsync(id, project.files, project.prompt, editPrompt, project.stack, selectedModel);
 
-    res.json({ message: 'Project edit started.', projectId: id });
+    res.json({ message: 'Project edit started.', projectId: id, creditsRemaining: Number(creditResult.credits || 0) });
   } catch (err) {
     next(err);
   }

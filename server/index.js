@@ -10,8 +10,10 @@ import db from './config/db.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import deployRoutes from './routes/deploy.js';
+import paymentRoutes from './routes/payments.js';
 import contactRoutes from './routes/contact.js';
 import careersRoutes from './routes/careers.js';
+import supportRoutes from './routes/support.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -61,8 +63,10 @@ app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/deploy', deployRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/careers', careersRoutes);
+app.use('/api/support', supportRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));

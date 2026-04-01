@@ -17,6 +17,7 @@ router.get('/me', authenticate, authController.getMe);
 router.put('/profile', authenticate, validators.validateUpdateProfile, authController.updateProfile);
 router.post('/profile-image', authenticate, upload.uploadAvatarImage, authController.uploadProfileImage);
 router.put('/github-token', authenticate, authController.updateGithubToken);
+router.delete('/account', authenticate, authController.deleteAccount);
 
 // GitHub OAuth
 router.get('/github', authController.githubRedirect);

@@ -7,6 +7,7 @@ import Footer from "./components/footer";
 import Background from "./components/Background";
 import ScrollToTop from "./components/ScrollToTop";
 import LoadingSpinner from "./components/LoadingSpinner";
+import HelpBot from "./components/HelpBot";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -142,6 +143,7 @@ export default function App() {
         </Suspense>
       </main>
       <Footer />
+      <HelpBot />
     </>
   );
 }

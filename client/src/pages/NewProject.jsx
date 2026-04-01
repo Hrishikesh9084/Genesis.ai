@@ -4,6 +4,7 @@ import { Sparkles, Loader2, Lightbulb, Cpu, ChevronDown, Check } from "lucide-re
 import api from "../services/api";
 import toast from "react-hot-toast";
 import { validateProjectInput } from "../utils/validators";
+import { useAuth } from "../context/AuthContext";
 
 const promptExamples = [
   "Build a todo app with user authentication, categories, due dates, and priority levels",
@@ -21,6 +22,7 @@ function isModelAllowed(modelId) {
 }
 
 export default function NewProject() {
+  const { user, refreshUser } = useAuth();
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [stack, setStack] = useState("nextjs-express");
@@ -142,6 +144,7 @@ export default function NewProject() {
     setLoading(true);
     try {
       const res = await api.post("/projects", { name, prompt, stack, model });
+      await refreshUser();
       toast.success("Project generation started!");
       navigate(`/project/${res.data.project.id}`);
     } catch (err) {
@@ -157,6 +160,9 @@ export default function NewProject() {
         <h1 className="text-3xl font-bold mb-2">Create New Project</h1>
         <p className="text-gray-400">
           Describe what you want to build and let AI generate it for you.
+        </p>
+        <p className="mt-2 text-sm text-orange-300">
+          Credits available: {Number(user?.credits || 0)}. Generating or editing a project consumes 1 credit.
         </p>
       </div>
 

@@ -129,10 +129,64 @@ async function sendPasswordResetEmail({ to, name, resetUrl }) {
   return sendMail({ to, subject, text, html });
 }
 
+async function sendHiredNotificationEmail({ to, name, roleTitle, applicationId }) {
+  const subject = 'Congratulations! Offer: ' + roleTitle + ' at Genesis.ai';
+  const text = `Hi ${name},\n\nCongratulations! We are pleased to offer you the position of ${roleTitle} at Genesis.ai.\n\nWe believe you will be a great fit for our team and look forward to working with you.\n\nApplication ID: ${applicationId}\n\nOur HR team will be in touch soon with next steps.\n\n- Genesis.ai Team`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+      <h2>Congratulations!</h2>
+      <p>Hi ${name},</p>
+      <p>We are thrilled to offer you the position of <strong>${roleTitle}</strong> at Genesis.ai.</p>
+      <p>We believe you will be a great addition to our team and look forward to working with you.</p>
+      <p><strong>Application ID:</strong> ${applicationId}</p>
+      <p>Our HR team will contact you shortly with details about the next steps and onboarding.</p>
+      <p style="margin-top: 24px;">- Genesis.ai Team</p>
+    </div>
+  `;
+  return sendMail({ to, subject, text, html });
+}
+
+async function sendShortlistedNotificationEmail({ to, name, roleTitle, applicationId }) {
+  const subject = 'Great news! You are shortlisted for ' + roleTitle + ' at Genesis.ai';
+  const text = `Hi ${name},\n\nGreat news! Your application for the ${roleTitle} position has been shortlisted.\n\nWe were impressed by your profile and would like to move forward with the next stage of our hiring process.\n\nApplication ID: ${applicationId}\n\nOur team will reach out to you soon with further details.\n\n- Genesis.ai Team`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+      <h2>You're Shortlisted!</h2>
+      <p>Hi ${name},</p>
+      <p>Great news! Your application for the <strong>${roleTitle}</strong> position at Genesis.ai has been shortlisted.</p>
+      <p>We were impressed by your profile and would like to move forward with the next stage of our hiring process.</p>
+      <p><strong>Application ID:</strong> ${applicationId}</p>
+      <p>Our team will be in touch with you soon regarding the next steps.</p>
+      <p style="margin-top: 24px;">- Genesis.ai Team</p>
+    </div>
+  `;
+  return sendMail({ to, subject, text, html });
+}
+
+async function sendRejectionNotificationEmail({ to, name, roleTitle, applicationId }) {
+  const subject = 'Application Status Update: ' + roleTitle + ' at Genesis.ai';
+  const text = `Hi ${name},\n\nThank you for applying to the ${roleTitle} position at Genesis.ai. We appreciate the effort you put into your application.\n\nAfter careful consideration, we have decided to move forward with other candidates at this time. However, we would like to keep your profile for future opportunities.\n\nApplication ID: ${applicationId}\n\nWe wish you the best in your career endeavors.\n\n- Genesis.ai Team`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+      <h2>Application Status Update</h2>
+      <p>Hi ${name},</p>
+      <p>Thank you for applying to the <strong>${roleTitle}</strong> position at Genesis.ai. We genuinely appreciate the time and effort you invested in your application.</p>
+      <p>After careful consideration, we have decided to move forward with other candidates at this time. However, we would love to keep your profile on file for suitable opportunities in the future.</p>
+      <p><strong>Application ID:</strong> ${applicationId}</p>
+      <p>We wish you the very best in your career endeavors.</p>
+      <p style="margin-top: 24px;">- Genesis.ai Team</p>
+    </div>
+  `;
+  return sendMail({ to, subject, text, html });
+}
+
 export default {
   isEmailConfigured,
   sendMail,
   sendEmailVerificationEmail,
   sendWelcomeEmail,
   sendPasswordResetEmail,
+  sendHiredNotificationEmail,
+  sendShortlistedNotificationEmail,
+  sendRejectionNotificationEmail,
 };

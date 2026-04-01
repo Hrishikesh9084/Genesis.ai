@@ -237,7 +237,7 @@ const register = async (req, res, next) => {
     const result = await db.query(
       `INSERT INTO users (name, email, password, email_verification_status, email_verification_error)
        VALUES ($1, $2, $3, 'false', NULL)
-       RETURNING id, name, email, password, email_verified_at, email_verification_status, email_verification_error, created_at`,
+       RETURNING id, name, email, password, credits, email_verified_at, email_verification_status, email_verification_error, created_at`,
       [name, email, hashedPassword]
     );
 
@@ -301,7 +301,7 @@ const getMe = async (req, res, next) => {
     await ensureVerificationColumns();
 
     const result = await db.query(
-      'SELECT id, name, email, avatar_url, email_verified_at, email_verification_status, email_verification_error, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, avatar_url, credits, email_verified_at, email_verification_status, email_verification_error, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -339,7 +339,7 @@ const updateProfile = async (req, res, next) => {
          END,
          updated_at = NOW()
        WHERE id = $3
-       RETURNING id, name, email, avatar_url, email_verified_at, email_verification_status, email_verification_error, created_at`,
+       RETURNING id, name, email, avatar_url, credits, email_verified_at, email_verification_status, email_verification_error, created_at`,
       [nextName, nextAvatarRaw, req.user.id]
     );
 
@@ -367,7 +367,7 @@ const uploadProfileImage = async (req, res, next) => {
       `UPDATE users
        SET avatar_url = $1, updated_at = NOW()
        WHERE id = $2
-       RETURNING id, name, email, avatar_url, email_verified_at, email_verification_status, email_verification_error, created_at`,
+       RETURNING id, name, email, avatar_url, credits, email_verified_at, email_verification_status, email_verification_error, created_at`,
       [avatarUrl, req.user.id]
     );
 
@@ -394,6 +394,20 @@ const updateGithubToken = async (req, res, next) => {
     res.json({ message: 'GitHub token updated successfully.' });
   } catch (err) {
     next(err);
+  }
+};
+
+const deleteAccount = async (req, res, next) => {
+  try {
+    const result = await db.query('DELETE FROM users WHERE id = $1 RETURNING id', [req.user.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    return res.json({ message: 'Account deleted successfully.' });
+  } catch (err) {
+    return next(err);
   }
 };
 
@@ -814,6 +828,7 @@ export default {
   updateProfile,
   uploadProfileImage,
   updateGithubToken,
+  deleteAccount,
   verifyEmail,
   resendVerificationEmail,
   forgotPassword,
