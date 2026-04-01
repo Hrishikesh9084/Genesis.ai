@@ -19,8 +19,7 @@ Beyond implementation, my vision for this product is centered on developer produ
 
 ## Developer Social Media Handles
 
-- GitHub: https://github.com/your-username
-- LinkedIn: https://www.linkedin.com/in/your-username
-- X (Twitter): https://x.com/your-username
-- Portfolio: https://your-portfolio.com
-- Email: your-email@example.com
+- GitHub: https://github.com/hrishikesh_9084
+- LinkedIn: www.linkedin.com/in/hrishikesh-chaudhari-146b1126a/
+- Instagram: https://www.instagram.com/iamhrishikeshchaudhari
+- Email: hrisikeshc.dev@gmail.com
