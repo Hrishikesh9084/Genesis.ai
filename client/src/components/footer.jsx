@@ -4,11 +4,47 @@ import {
   LinkedinIcon,
   TwitterIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Logo from "./Logo";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
+import api from "../services/api";
 
 export default function Footer() {
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
+
+  const isValidEmail = (value) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  };
+
+  const handleNewsletterSubscribe = async (event) => {
+    event?.preventDefault();
+    const email = newsletterEmail.trim();
+
+    if (!email) {
+      toast.error("Enter your email address");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      toast.error("Enter a valid email address");
+      return;
+    }
+
+    setSubscribing(true);
+    try {
+      const res = await api.post("/newsletter/subscribe", { email });
+      toast.success(res.data?.message || "Subscribed successfully");
+      setNewsletterEmail("");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to subscribe");
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
   return (
     <motion.footer
       className="relative overflow-hidden px-6 md:px-16 lg:px-24 xl:px-32 w-full text-sm text-white bg-black/50  mt-24 pt-10"
@@ -91,16 +127,24 @@ export default function Footer() {
               The latest news, articles, and resources, sent to your inbox
               weekly.
             </p>
-            <div className="flex items-center">
+            <form className="flex items-center" onSubmit={handleNewsletterSubscribe}>
               <input
                 className="rounded-l-md bg-black/50 outline-none border border-b-white w-full max-w-64 h-11 px-3"
                 type="email"
                 placeholder="Enter your email"
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
+                autoComplete="email"
+                required
               />
-              <button className="bg-linear-to-b from-orange-500 to-orange-500 cursor-pointer hover:from-orange-500 hover:to-orange-500 transition px-4 h-11 text-white rounded-r-md">
-                Subscribe
+              <button
+                type="submit"
+                disabled={subscribing || !newsletterEmail.trim()}
+                className="bg-linear-to-b from-orange-500 to-orange-500 cursor-pointer hover:from-orange-500 hover:to-orange-500 transition px-4 h-11 text-white rounded-r-md disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {subscribing ? "Subscribing..." : "Subscribe"}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </div>

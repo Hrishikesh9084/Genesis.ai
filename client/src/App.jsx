@@ -28,6 +28,7 @@ const Careers = lazy(() => import("./pages/Careers"));
 const CareersApply = lazy(() => import("./pages/CareersApply"));
 const CareersStatus = lazy(() => import("./pages/CareersStatus"));
 const AdminApplications = lazy(() => import("./pages/AdminApplications"));
+const AdminNewsletter = lazy(() => import("./pages/AdminNewsletter"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 function ProtectedRoute({ children }) {
@@ -132,6 +133,7 @@ export default function App() {
             <Route path="/project/:id/deploy" element={<ProtectedRoute><DeployProject /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/admin/applications" element={<ProtectedRoute><AdminApplications /></ProtectedRoute>} />
+            <Route path="/admin/newsletter" element={<ProtectedRoute><AdminNewsletter /></ProtectedRoute>} />
 
             {/* OAuth callback - no guard, handles its own auth */}
             <Route path="/auth/github/callback" element={<GithubCallback />} />

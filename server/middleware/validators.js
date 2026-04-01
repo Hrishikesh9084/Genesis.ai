@@ -262,6 +262,16 @@ function validateContactSubmission(req, res, next) {
   next();
 }
 
+function validateNewsletterSubscription(req, res, next) {
+  const { email } = req.body || {};
+
+  if (!isValidEmail(email)) {
+    return badRequest(res, 'A valid email is required.');
+  }
+
+  next();
+}
+
 function isValidHttpUrl(value) {
   if (!value) return true;
   try {
@@ -538,6 +548,7 @@ export default {
   validateDeployBody,
   validateDeploymentKeys,
   validateDeployIdParam,
+  validateNewsletterSubscription,
   validateContactSubmission,
   validateCareerApplication,
   validateApplicationIdParam,

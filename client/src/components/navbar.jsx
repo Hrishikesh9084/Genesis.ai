@@ -57,8 +57,12 @@ export default function Navbar() {
   const authLinks = [
     { name: "Dashboard", href: "/dashboard" },
     { name: "New Project", href: "/new-project" },
-    ...(isAdminUser ? [{ name: "Admin", href: "/admin/applications" }] : []),
   ];
+
+  const adminLinks = isAdminUser ? [
+    { name: "Job Applications", href: "/admin/applications" },
+    { name: "Newsletter", href: "/admin/newsletter" }
+  ] : [];
 
   const loggedInTopLinks = [
     { name: "Home", href: "/" },
@@ -78,6 +82,10 @@ export default function Navbar() {
       name: "Workspace",
       links: authLinks,
     },
+    ...(isAdminUser ? [{
+      name: "Admin",
+      links: adminLinks,
+    }] : []),
     {
       name: "Platform",
       links: [
@@ -87,7 +95,7 @@ export default function Navbar() {
     },
   ];
 
-  const mobileLinks = user ? [...publicLinks, ...authLinks] : publicLinks;
+  const mobileLinks = user ? [...publicLinks, ...authLinks, ...adminLinks] : publicLinks;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -241,7 +249,7 @@ export default function Navbar() {
             {link.name}
           </Link>
         ))}
-            
+
         {!user && (
           <Link to="/register" className="btn bg-linear-to-r from-orange-500 to-orange-600 border-0" onClick={() => setIsOpen(false)}>
             Sign Up

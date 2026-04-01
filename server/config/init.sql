@@ -134,6 +134,16 @@ CREATE TABLE IF NOT EXISTS credit_transactions (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  subscribed_at TIMESTAMP DEFAULT NOW(),
+  last_sent_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_deployments_project_id ON deployments(project_id);
 CREATE INDEX IF NOT EXISTS idx_job_applications_email ON job_applications(email);
@@ -143,3 +153,34 @@ CREATE INDEX IF NOT EXISTS idx_job_applications_created_at ON job_applications(c
 CREATE INDEX IF NOT EXISTS idx_job_roles_is_active ON job_roles(is_active);
 CREATE INDEX IF NOT EXISTS idx_credit_tx_user_id ON credit_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_credit_tx_status ON credit_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_newsletter_active ON newsletter_subscribers(is_active);
+
+CREATE TABLE IF NOT EXISTS newsletter_issues (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title VARCHAR(255) NOT NULL,
+  subject VARCHAR(255),
+  status VARCHAR(50) DEFAULT 'draft',
+  scheduled_at TIMESTAMP,
+  sent_at TIMESTAMP,
+  subscriber_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS newsletter_articles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  issue_id UUID REFERENCES newsletter_issues(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  content TEXT,
+  category VARCHAR(100),
+  link TEXT,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_newsletter_issues_status ON newsletter_issues(status);
+CREATE INDEX IF NOT EXISTS idx_newsletter_issues_scheduled ON newsletter_issues(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_newsletter_articles_issue ON newsletter_articles(issue_id);
+CREATE INDEX IF NOT EXISTS idx_newsletter_articles_order ON newsletter_articles(order_index);

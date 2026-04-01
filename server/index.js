@@ -14,6 +14,9 @@ import paymentRoutes from './routes/payments.js';
 import contactRoutes from './routes/contact.js';
 import careersRoutes from './routes/careers.js';
 import supportRoutes from './routes/support.js';
+import newsletterRoutes from './routes/newsletter.js';
+import adminNewsletterRoutes from './routes/adminNewsletter.js';
+import newsletterService from './services/newsletterService.js';
 import errorHandler from './middleware/errorHandler.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -67,6 +70,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/careers', careersRoutes);
 app.use('/api/support', supportRoutes);
+app.use('/api/newsletter', newsletterRoutes);
+app.use('/api/admin/newsletter', adminNewsletterRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -82,6 +87,7 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
   console.log(`Genesis.ai server running on port ${PORT}`);
+  newsletterService.startNewsletterScheduler();
 });
 
 async function shutdown(signal) {

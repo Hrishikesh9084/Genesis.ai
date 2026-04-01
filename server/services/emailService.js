@@ -59,7 +59,7 @@ async function sendMail({ to, subject, text, html }) {
   }
 
   const transporter = createTransporter();
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to,
     subject,
@@ -67,7 +67,13 @@ async function sendMail({ to, subject, text, html }) {
     html,
   });
 
-  return { skipped: false };
+  return {
+    skipped: false,
+    accepted: info.accepted || [],
+    rejected: info.rejected || [],
+    response: info.response,
+    messageId: info.messageId,
+  };
 }
 
 async function sendWelcomeEmail({ to, name }) {
