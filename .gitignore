@@ -1,6 +1,7 @@
 node_modules/
 .env
 .env.example
+GITHUB_OAUTH_SETUP.md
 dist/
 build/
 .DS_Store
