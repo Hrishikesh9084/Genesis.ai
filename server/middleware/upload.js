@@ -5,15 +5,23 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const avatarDir = path.join(__dirname, '../uploads/avatars');
-const resumeDir = path.join(__dirname, '../uploads/resumes');
 
-if (!fs.existsSync(avatarDir)) {
-  fs.mkdirSync(avatarDir, { recursive: true });
-}
+// Use /tmp on serverless (Lambda, etc.), otherwise use local uploads directory
+const isServerless = process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.VERCEL || process.env.NODE_ENV === 'serverless';
+const baseDir = isServerless ? '/tmp' : path.join(__dirname, '../uploads');
+const avatarDir = path.join(baseDir, 'avatars');
+const resumeDir = path.join(baseDir, 'resumes');
 
-if (!fs.existsSync(resumeDir)) {
-  fs.mkdirSync(resumeDir, { recursive: true });
+// Create directories if they don't exist (will work on /tmp)
+try {
+  if (!fs.existsSync(avatarDir)) {
+    fs.mkdirSync(avatarDir, { recursive: true });
+  }
+  if (!fs.existsSync(resumeDir)) {
+    fs.mkdirSync(resumeDir, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Warning: Could not create upload directories:', err.message);
 }
 
 const storage = multer.diskStorage({
