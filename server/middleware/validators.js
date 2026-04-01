@@ -429,6 +429,15 @@ function validateAdminCreateJobRole(req, res, next) {
   next();
 }
 
+function validateJobRoleIdParam(req, res, next) {
+  const roleId = String(req.params.id || '').trim();
+  if (!/^[a-z0-9][a-z0-9-]{0,119}$/i.test(roleId)) {
+    return badRequest(res, 'Job role id must be 1-120 chars and contain only letters, numbers, or hyphens.');
+  }
+
+  next();
+}
+
 export default {
   validateRegister,
   validateLogin,
@@ -450,4 +459,5 @@ export default {
   validateApplicationStatusUpdate,
   validateApplicationStatusLookup,
   validateAdminCreateJobRole,
+  validateJobRoleIdParam,
 };

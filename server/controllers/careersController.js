@@ -668,6 +668,43 @@ const createJobRole = async (req, res, next) => {
   }
 };
 
+const deleteJobRole = async (req, res, next) => {
+  try {
+    await ensureJobRolesTable();
+
+    const result = await db.query(
+      `UPDATE job_roles
+       SET is_active = FALSE, updated_at = NOW()
+       WHERE id = $1
+       RETURNING
+         id,
+         title,
+         department,
+         location,
+         type,
+         summary,
+         requirements,
+         is_active,
+         created_at,
+         updated_at`,
+      [req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Job role not found.' });
+    }
+
+    invalidateJobsCache();
+
+    return res.json({
+      role: sanitizeRoleRecord(result.rows[0]),
+      message: 'Job role deleted successfully.',
+    });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const downloadApplicationResume = async (req, res, next) => {
   try {
     const result = await db.query(
@@ -712,6 +749,7 @@ export default {
   applyForJob,
   listJobRoles,
   createJobRole,
+  deleteJobRole,
   listApplications,
   getApplicationStatus,
   updateApplicationStatus,

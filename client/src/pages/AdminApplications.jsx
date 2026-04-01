@@ -20,6 +20,7 @@ export default function AdminApplications() {
   const [loading, setLoading] = useState(true);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [creatingRole, setCreatingRole] = useState(false);
+  const [deletingRoleId, setDeletingRoleId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [roleMessage, setRoleMessage] = useState("");
   const [updatingId, setUpdatingId] = useState("");
@@ -170,6 +171,28 @@ export default function AdminApplications() {
     }
   };
 
+  const handleDeleteRole = async (role) => {
+    if (!role?.id) return;
+
+    const confirmed = window.confirm(`Delete job role "${role.title}"?`);
+    if (!confirmed) return;
+
+    setDeletingRoleId(role.id);
+    setRoleMessage("");
+    setErrorMessage("");
+
+    try {
+      await api.delete(`/careers/admin/jobs/${role.id}`);
+      setRoleMessage("Job role deleted successfully.");
+      setFilters((prev) => (prev.roleId === role.id ? { ...prev, roleId: "", page: 1 } : prev));
+      await loadRoles();
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || "Failed to delete job role.");
+    } finally {
+      setDeletingRoleId("");
+    }
+  };
+
   const handleResumeDownload = async (application) => {
     try {
       const response = await api.get(`/careers/admin/applications/${application.id}/resume`, {
@@ -250,10 +273,21 @@ export default function AdminApplications() {
             <div className="mt-2 flex flex-wrap gap-2">
               {rolesLoading && <span className="text-sm text-slate-400">Loading roles...</span>}
               {!rolesLoading && roleOptions.length === 0 && <span className="text-sm text-slate-400">No roles found.</span>}
-              {!rolesLoading && roleOptions.map((role) => (
-                <span key={role.id} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-300">
-                  {role.title}
-                </span>
+              {!rolesLoading && roles.map((role) => (
+                <div key={role.id} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-xs text-slate-300">
+                  <span>{role.title}</span>
+                  {!role.isActive && <span className="text-[10px] uppercase text-slate-400">inactive</span>}
+                  {role.isActive && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRole(role)}
+                      disabled={deletingRoleId === role.id}
+                      className="rounded border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[10px] uppercase text-red-300 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {deletingRoleId === role.id ? "Deleting..." : "Delete"}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
