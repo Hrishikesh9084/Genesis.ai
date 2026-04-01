@@ -64,7 +64,7 @@ export default function HelpBot() {
         <div className="mb-3 w-96 max-w-[calc(100vw-2rem)] rounded-2xl border border-white/15 bg-gray-950/95 p-2 backdrop-blur-xl shadow-2xl">
           <div className="flex items-center justify-between border-b border-white/10 px-4 py-3.5">
             <div className="flex items-center gap-2">
-              <Bot className="h-4 w-4 text-orange-400 p-2" />
+              <Bot className="h-4 w-4 text-orange-400" />
               <p className="text-sm font-semibold text-white">Genesis Help Bot</p>
             </div>
             <button
