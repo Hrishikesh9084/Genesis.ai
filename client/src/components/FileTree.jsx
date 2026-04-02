@@ -81,7 +81,7 @@ export default function FileTree({ files, onSelect, selectedFile }) {
   });
 
   return (
-    <div className="py-2 overflow-y-auto">
+    <div data-lenis-prevent className="py-2 overflow-y-auto overscroll-contain">
       {entries.map(([name, node]) => (
         <TreeNode
           key={name}

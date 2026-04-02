@@ -214,7 +214,10 @@ export default function ProjectDetail() {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
         {/* File tree sidebar */}
-        <div className="w-64 bg-gray-900 border-r border-gray-800 overflow-y-auto flex-shrink-0">
+        <div
+          data-lenis-prevent
+          className="w-64 bg-gray-900 border-r border-gray-800 overflow-y-auto overscroll-contain shrink-0"
+        >
           <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
             Files
           </div>

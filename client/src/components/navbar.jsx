@@ -104,9 +104,14 @@ export default function Navbar() {
     },
   ];
 
+  const careersMobileLinks = [
+    { name: "Apply", href: "/careers/apply" },
+    { name: "Track Status", href: "/careers/status" },
+  ];
+
   const mobileLinks = user
-    ? [...publicLinks, ...authLinks, ...adminLinks]
-    : publicLinks;
+    ? [...publicLinks, ...careersMobileLinks, ...authLinks, ...adminLinks]
+    : [...publicLinks, ...careersMobileLinks];
 
   useEffect(() => {
     const handleScroll = () => {
