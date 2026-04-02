@@ -15,6 +15,10 @@ function requiresGithubRepo(target) {
   return target === 'backend' || target === 'fullstack';
 }
 
+function isProjectDeployable(status) {
+  return status === 'ready' || status === 'deployed';
+}
+
 function ensureDeploymentColumns() {
   if (!ensureDeploymentColumnsPromise) {
     ensureDeploymentColumnsPromise = db
@@ -61,7 +65,7 @@ const deployProject = async (req, res, next) => {
 
     const project = projectResult.rows[0];
 
-    if (project.status !== 'ready') {
+    if (!isProjectDeployable(project.status)) {
       return res.status(400).json({ error: 'Project is not ready for deployment.' });
     }
 
