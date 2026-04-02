@@ -134,7 +134,17 @@ export default function AdminNewsletter() {
       setArticles([...articles, response.data]);
       setArticleForm({ title: '', description: '', content: '', category: '', link: '' });
       setShowArticleForm(false);
-      toast.success('Article added');
+
+      const delivery = response.data?.autoDelivery;
+      if (delivery?.attempted && delivery.sent > 0) {
+        toast.success(`Article added. Newsletter sent to ${delivery.sent} subscribers automatically.`);
+      } else if (delivery?.attempted && delivery?.error) {
+        toast.error(`Article added, but auto-send failed: ${delivery.error}`);
+      } else {
+        toast.success('Article added');
+      }
+
+      await loadIssueDetail(selectedIssue.id);
     } catch (error) {
       console.error('Failed to add article:', error);
       toast.error('Failed to add article');

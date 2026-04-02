@@ -200,8 +200,43 @@ export default {
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [issueId, title.trim(), description.trim(), content?.trim() || null, category?.trim() || null, link?.trim() || null, orderIndex]
       );
-      
-      res.status(201).json(result.rows[0]);
+
+      const createdArticle = result.rows[0];
+      let autoDelivery = null;
+
+      // Auto-send the issue once an article is added, unless it was already sent.
+      const currentIssueResult = await db.query(
+        'SELECT id, status FROM newsletter_issues WHERE id = $1',
+        [issueId]
+      );
+
+      const currentIssue = currentIssueResult.rows[0];
+      const shouldAutoSend = currentIssue && currentIssue.status !== 'sent';
+
+      if (shouldAutoSend) {
+        try {
+          const delivery = await newsletterService.sendIssue(issueId);
+          autoDelivery = {
+            attempted: true,
+            sent: delivery.sent,
+            failedCount: delivery.failedCount,
+            totalSubscribers: delivery.totalSubscribers,
+          };
+        } catch (sendError) {
+          console.error('Auto-send after article creation failed:', sendError.message);
+          autoDelivery = {
+            attempted: true,
+            sent: 0,
+            failedCount: 0,
+            error: sendError.message,
+          };
+        }
+      }
+
+      res.status(201).json({
+        ...createdArticle,
+        autoDelivery,
+      });
     } catch (error) {
       console.error('Error creating newsletter article:', error);
       res.status(500).json({ error: 'Failed to create newsletter article' });
