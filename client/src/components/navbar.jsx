@@ -44,6 +44,7 @@ export default function Navbar() {
   const publicLinks = [
     { name: "Home", href: "/" },
     { name: "Pricing", href: "/plans" },
+    { name: "Docs", href: "/docs" },
     { name: "About", href: "/about" },
     { name: "Careers", href: "/careers" },
     { name: "Contact", href: "/contact" },
@@ -69,6 +70,7 @@ export default function Navbar() {
   const loggedInTopLinks = [
     { name: "Home", href: "/" },
     { name: "Pricing", href: "/plans" },
+    { name: "Docs", href: "/docs" },
   ];
 
   const loggedInNavSections = [
@@ -95,6 +97,7 @@ export default function Navbar() {
     {
       name: "Platform",
       links: [
+        { name: "Docs", href: "/docs" },
         { name: "About", href: "/about" },
         { name: "Contact", href: "/contact" },
       ],

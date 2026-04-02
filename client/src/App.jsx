@@ -13,6 +13,7 @@ const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const PricingPlans = lazy(() => import("./pages/pricing-plans"));
+const Documentation = lazy(() => import("./pages/Documentation"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const NewProject = lazy(() => import("./pages/NewProject"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
@@ -22,6 +23,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const GithubCallback = lazy(() => import("./pages/GithubCallback"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const CookiesPolicy = lazy(() => import("./pages/CookiesPolicy"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Careers = lazy(() => import("./pages/Careers"));
@@ -117,6 +119,7 @@ export default function App() {
 
             {/* Public route - accessible by everyone */}
             <Route path="/plans" element={<PricingPlans />} />
+            <Route path="/docs" element={<Documentation />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/careers" element={<Careers />} />
             <Route path="/careers/apply" element={<CareersApply />} />
@@ -124,6 +127,7 @@ export default function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/cookies-policy" element={<CookiesPolicy />} />
 
             {/* Protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

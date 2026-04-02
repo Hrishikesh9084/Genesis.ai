@@ -107,6 +107,9 @@ export default function Footer() {
             <Link className="hover:text-orange-600 transition" to="/about" onClick={()=>scrollTo(0,0)}>
               About us
             </Link>
+            <Link className="hover:text-orange-600 transition" to="/docs" onClick={()=>scrollTo(0,0)}>
+              Documentation
+            </Link>
             <Link className="hover:text-orange-600 transition" to="/careers" onClick={()=>scrollTo(0,0)}>
               Careers
             </Link>
@@ -155,7 +158,7 @@ export default function Footer() {
         <div className="flex items-center gap-4">
           <Link to="/privacy-policy" onClick={()=>scrollTo(0,0)}>Privacy Policy</Link>
           <Link to="/terms-of-service" onClick={()=>scrollTo(0,0)}>Terms of Service</Link>
-          <Link to="/">Cookie Policy</Link>
+          <Link to="/cookies-policy" onClick={()=>scrollTo(0,0)}>Cookie Policy</Link>
         </div>
       </div>
     </motion.footer>
