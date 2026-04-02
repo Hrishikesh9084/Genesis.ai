@@ -7,6 +7,81 @@ async function getOctokitClass() {
   return OctokitClass;
 }
 
+function normalizeFilePayload(input) {
+  const parsed = typeof input === 'string' ? JSON.parse(input) : input;
+  const root = parsed?.files && typeof parsed.files === 'object' ? parsed.files : parsed;
+
+  const normalized = {};
+
+  const pushEntry = (filePath, content) => {
+    if (!filePath || typeof filePath !== 'string') return;
+
+    const safePath = filePath
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '')
+      .replace(/^\.\//, '')
+      .trim();
+
+    if (!safePath || safePath.includes('..') || safePath.endsWith('/')) return;
+
+    normalized[safePath] =
+      typeof content === 'string' ? content : JSON.stringify(content ?? '', null, 2);
+  };
+
+  const flatten = (value, prefix = '') => {
+    if (!value) return;
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (item && typeof item === 'object' && typeof item.path === 'string') {
+          pushEntry(item.path, item.content ?? item.data ?? '');
+        }
+      }
+      return;
+    }
+
+    if (typeof value !== 'object') return;
+
+    for (const [key, child] of Object.entries(value)) {
+      if (!key) continue;
+
+      if (typeof child === 'string') {
+        const maybePath = prefix ? `${prefix}/${key}` : key;
+        pushEntry(maybePath, child);
+        continue;
+      }
+
+      if (child && typeof child === 'object') {
+        if (typeof child.path === 'string' && (typeof child.content === 'string' || typeof child.data === 'string')) {
+          pushEntry(child.path, child.content ?? child.data ?? '');
+          continue;
+        }
+
+        const nextPrefix = prefix ? `${prefix}/${key}` : key;
+        flatten(child, nextPrefix);
+      }
+    }
+  };
+
+  if (Array.isArray(root)) {
+    flatten(root);
+  } else if (root && typeof root === 'object') {
+    for (const [key, value] of Object.entries(root)) {
+      if (typeof value === 'string') {
+        pushEntry(key, value);
+      } else if (value && typeof value === 'object') {
+        if (typeof value.path === 'string' && (typeof value.content === 'string' || typeof value.data === 'string')) {
+          pushEntry(value.path, value.content ?? value.data ?? '');
+        } else {
+          flatten(value, key.includes('/') ? '' : key);
+        }
+      }
+    }
+  }
+
+  return normalized;
+}
+
 const createAndPushRepo = async (githubToken, repoName, files, isPrivate = false) => {
   const Octokit = await getOctokitClass();
   const octokit = new Octokit({ auth: githubToken });
@@ -26,11 +101,12 @@ const createAndPushRepo = async (githubToken, repoName, files, isPrivate = false
 
   const owner = repo.owner.login;
   const repoNameFinal = repo.name;
+  const defaultBranch = repo.default_branch || 'main';
 
   const { data: ref } = await octokit.rest.git.getRef({
     owner,
     repo: repoNameFinal,
-    ref: 'heads/main',
+    ref: `heads/${defaultBranch}`,
   });
 
   const baseTreeSha = ref.object.sha;
@@ -42,7 +118,7 @@ const createAndPushRepo = async (githubToken, repoName, files, isPrivate = false
   });
 
   const treeItems = [];
-  const parsedFiles = typeof files === 'string' ? JSON.parse(files) : files;
+  const parsedFiles = normalizeFilePayload(files);
 
   for (const [filePath, content] of Object.entries(parsedFiles)) {
     const { data: blob } = await octokit.rest.git.createBlob({
@@ -58,6 +134,10 @@ const createAndPushRepo = async (githubToken, repoName, files, isPrivate = false
       type: 'blob',
       sha: blob.sha,
     });
+  }
+
+  if (treeItems.length === 0) {
+    throw new Error('No files were found to push to GitHub.');
   }
 
   const { data: tree } = await octokit.rest.git.createTree({
@@ -78,7 +158,7 @@ const createAndPushRepo = async (githubToken, repoName, files, isPrivate = false
   await octokit.rest.git.updateRef({
     owner,
     repo: repoNameFinal,
-    ref: 'heads/main',
+    ref: `heads/${defaultBranch}`,
     sha: newCommit.sha,
   });
 

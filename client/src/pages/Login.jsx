@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { Github, Loader2 } from 'lucide-react';
 import { FcGoogle } from 'react-icons/fc';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 import { GITHUB_OAUTH_URL, GOOGLE_OAUTH_URL } from '../services/api';
 import { validateLoginInput } from '../utils/validators';
 
@@ -12,6 +13,9 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -87,6 +91,28 @@ const Login = () => {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+
+    const emailToUse = forgotEmail.trim() || email.trim();
+    if (!emailToUse) {
+      toast.error("Enter your email to receive a reset link.");
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const response = await api.post('/auth/forgot-password', { email: emailToUse });
+      toast.success(response.data?.message || 'If this email is registered, a reset link has been sent.');
+      setShowForgotPassword(false);
+      setForgotEmail("");
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to send reset link');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
       <form onSubmit={handleSubmit} className="card w-full max-w-md space-y-5">
@@ -108,7 +134,19 @@ const Login = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="block text-sm font-medium text-gray-300">Password</label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotPassword((prev) => !prev);
+                setForgotEmail(email.trim());
+              }}
+              className="text-xs text-orange-400 hover:text-orange-300"
+            >
+              Forgot password?
+            </button>
+          </div>
           <input
             onChange={(e) => setPassword(e.target.value)}
             value={password}
@@ -118,6 +156,32 @@ const Login = () => {
             required
           />
         </div>
+
+        {showForgotPassword && (
+          <div className="rounded-xl border border-gray-700/70 bg-gray-900/40 p-3 space-y-3">
+            <p className="text-xs text-gray-400">
+              Enter your account email. We will send a password reset link.
+            </p>
+            <form onSubmit={handleForgotPassword} className="space-y-3">
+              <input
+                type="email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="input-field"
+                required
+              />
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="btn-secondary w-full flex items-center justify-center gap-2"
+              >
+                {forgotLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {forgotLoading ? 'Sending reset link...' : 'Send reset link'}
+              </button>
+            </form>
+          </div>
+        )}
 
         <label className="flex items-start gap-2 text-sm text-gray-300">
           <input

@@ -11,6 +11,7 @@ import HelpBot from "./components/HelpBot";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Register = lazy(() => import("./pages/Register"));
 const PricingPlans = lazy(() => import("./pages/pricing-plans"));
 const Documentation = lazy(() => import("./pages/Documentation"));
@@ -116,6 +117,7 @@ export default function App() {
             <Route path="/" element={<GuestRoute><Home /></GuestRoute>} />
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
             <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Public route - accessible by everyone */}
             <Route path="/plans" element={<PricingPlans />} />
