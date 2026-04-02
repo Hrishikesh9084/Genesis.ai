@@ -13,14 +13,44 @@ function toInt(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function isServerlessRuntime() {
+  return Boolean(
+    process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      process.env.NETLIFY ||
+      process.env.GOOGLE_CLOUD_FUNCTIONS ||
+      process.env.FUNCTIONS_WORKER_RUNTIME
+  );
+}
+
+function isTransientDbError(err) {
+  const message = String(err?.message || '').toLowerCase();
+  return (
+    message.includes('connection terminated') ||
+    message.includes('connection refused') ||
+    message.includes('connection timeout') ||
+    message.includes('timeout') ||
+    message.includes('econnreset') ||
+    message.includes('socket hang up') ||
+    message.includes('server closed the connection unexpectedly') ||
+    message.includes('terminat')
+  );
+}
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const serverlessRuntime = isServerlessRuntime();
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: toInt(process.env.DB_POOL_MAX, 40),
-  min: toInt(process.env.DB_POOL_MIN, 5),
-  idleTimeoutMillis: toInt(process.env.DB_IDLE_TIMEOUT_MS, 30000),
-  connectionTimeoutMillis: toInt(process.env.DB_CONNECTION_TIMEOUT_MS, 5000),
-  query_timeout: toInt(process.env.DB_QUERY_TIMEOUT_MS, 15000),
-  statement_timeout: toInt(process.env.DB_STATEMENT_TIMEOUT_MS, 20000),
+  max: toInt(process.env.DB_POOL_MAX, serverlessRuntime ? 1 : 40),
+  min: toInt(process.env.DB_POOL_MIN, serverlessRuntime ? 0 : 5),
+  idleTimeoutMillis: toInt(process.env.DB_IDLE_TIMEOUT_MS, serverlessRuntime ? 10000 : 30000),
+  connectionTimeoutMillis: toInt(process.env.DB_CONNECTION_TIMEOUT_MS, serverlessRuntime ? 15000 : 5000),
+  query_timeout: toInt(process.env.DB_QUERY_TIMEOUT_MS, serverlessRuntime ? 30000 : 15000),
+  statement_timeout: toInt(process.env.DB_STATEMENT_TIMEOUT_MS, serverlessRuntime ? 45000 : 20000),
   keepAlive: true,
   keepAliveInitialDelayMillis: toInt(process.env.DB_KEEPALIVE_INITIAL_DELAY_MS, 10000),
 });
@@ -29,9 +59,11 @@ pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
 });
 
-const schemaReady = pool
-  .query(
-    `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+const schemaReady = serverlessRuntime
+  ? Promise.resolve()
+  : pool
+      .query(
+        `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
      ALTER TABLE IF EXISTS projects
      ADD COLUMN IF NOT EXISTS model VARCHAR(100) DEFAULT 'gemini-2.5-flash';
@@ -152,17 +184,36 @@ const schemaReady = pool
       CREATE INDEX IF NOT EXISTS idx_newsletter_issues_status ON newsletter_issues(status);
       CREATE INDEX IF NOT EXISTS idx_newsletter_issues_scheduled ON newsletter_issues(scheduled_at);
       CREATE INDEX IF NOT EXISTS idx_newsletter_articles_issue ON newsletter_articles(issue_id);
-      CREATE INDEX IF NOT EXISTS idx_newsletter_articles_order ON newsletter_articles(order_index);`
-  )
-  .catch((err) => {
-    console.error('Schema migration failed:', err.message);
-    throw err;
-  });
+       CREATE INDEX IF NOT EXISTS idx_newsletter_articles_order ON newsletter_articles(order_index);`
+        )
+        .catch((err) => {
+          console.error('Schema migration failed:', err.message);
+          throw err;
+        });
+
+  async function queryWithRetry(text, params) {
+    const maxAttempts = 2;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        await schemaReady;
+        return await pool.query(text, params);
+      } catch (err) {
+        if (attempt < maxAttempts && isTransientDbError(err)) {
+          await sleep(250 * attempt);
+          continue;
+        }
+
+        throw err;
+      }
+    }
+
+    throw new Error('Database query failed after retries.');
+  }
 
 const db = {
   query: async (text, params) => {
-    await schemaReady;
-    return pool.query(text, params);
+      return queryWithRetry(text, params);
   },
   pool,
 };

@@ -713,8 +713,6 @@ const githubRedirect = (req, res) => {
 // GitHub OAuth: handle callback, exchange code for token, find/create user
 const githubCallback = async (req, res, next) => {
   try {
-    await ensureVerificationColumns();
-
     const clientBaseUrl = resolveClientBaseUrl(req);
     const { code } = req.query;
     if (!code) {
@@ -837,8 +835,6 @@ const googleRedirect = (req, res) => {
 
 const googleCallback = async (req, res) => {
   try {
-    await ensureVerificationColumns();
-
     const clientBaseUrl = resolveClientBaseUrl(req);
     const { code, error, error_description: errorDescription } = req.query;
 
