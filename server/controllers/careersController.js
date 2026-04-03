@@ -657,6 +657,54 @@ const updateApplicationStatus = async (req, res, next) => {
   }
 };
 
+const deleteApplication = async (req, res, next) => {
+  try {
+    const applicationId = req.params.id;
+
+    const appResult = await db.query(
+      `SELECT id, resume_file_path
+       FROM job_applications
+       WHERE id = $1`,
+      [applicationId]
+    );
+
+    if (appResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Application not found.' });
+    }
+
+    const application = appResult.rows[0];
+
+    const deleteResult = await db.query(
+      'DELETE FROM job_applications WHERE id = $1 RETURNING id',
+      [applicationId]
+    );
+
+    if (deleteResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Application not found.' });
+    }
+
+    const filePath = application.resume_file_path;
+    if (filePath) {
+      const resolvedPath = path.resolve(filePath);
+      const allowedPrefix = path.resolve(resumesBaseDir) + path.sep;
+
+      if (resolvedPath.startsWith(allowedPrefix)) {
+        try {
+          await fs.promises.unlink(resolvedPath);
+        } catch (unlinkErr) {
+          if (unlinkErr.code !== 'ENOENT') {
+            console.warn('Failed to delete application resume file:', unlinkErr.message);
+          }
+        }
+      }
+    }
+
+    return res.json({ message: 'Application deleted successfully.' });
+  } catch (err) {
+    return next(err);
+  }
+};
+
 const listJobRoles = async (_req, res, next) => {
   try {
     const roles = await getJobRoles({ includeInactive: true });
@@ -896,5 +944,6 @@ export default {
   listApplications,
   getApplicationStatus,
   updateApplicationStatus,
+  deleteApplication,
   downloadApplicationResume,
 };

@@ -240,7 +240,8 @@ export default function CareersApply() {
               name="yearsExperience"
               value={formValues.yearsExperience}
               onChange={handleChange}
-              placeholder="Optional"
+              placeholder="Enter Your Experience"
+              required
             />
           </div>
 
@@ -307,7 +308,6 @@ export default function CareersApply() {
               onChange={handleChange}
               minLength={50}
               maxLength={5000}
-              required
               placeholder="Tell us why you are a fit for this role."
             />
             <p className="mt-1 text-xs text-slate-500">Minimum 50 characters.</p>

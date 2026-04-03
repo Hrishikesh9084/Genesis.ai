@@ -40,6 +40,11 @@ router.patch(
 	validators.validateApplicationStatusUpdate,
 	careersController.updateApplicationStatus
 );
+router.delete(
+	'/admin/applications/:id',
+	validators.validateApplicationIdParam,
+	careersController.deleteApplication
+);
 router.get(
 	'/admin/applications/:id/resume',
 	validators.validateApplicationIdParam,

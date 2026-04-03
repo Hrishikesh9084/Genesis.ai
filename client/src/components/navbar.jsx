@@ -162,7 +162,7 @@ export default function Navbar() {
         <Link to="/">
           <Logo
             className="text-2xl"
-            text="Genesis"
+            text="Genesis.AI"
             shuffleDirection="right"
             duration={0.35}
             animationMode="evenodd"

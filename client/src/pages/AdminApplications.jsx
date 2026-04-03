@@ -21,6 +21,9 @@ export default function AdminApplications() {
   const [rolesLoading, setRolesLoading] = useState(true);
   const [creatingRole, setCreatingRole] = useState(false);
   const [deletingRoleId, setDeletingRoleId] = useState("");
+  const [deletingApplicationId, setDeletingApplicationId] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [applicationToDelete, setApplicationToDelete] = useState(null);
   const [editingRole, setEditingRole] = useState(null);
   const [editingRoleData, setEditingRoleData] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -119,6 +122,46 @@ export default function AdminApplications() {
     } finally {
       setUpdatingId("");
     }
+  };
+
+  const handleDeleteApplication = (application) => {
+    if (!application?.id) return;
+    setApplicationToDelete(application);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!applicationToDelete?.id) return;
+
+    setDeletingApplicationId(applicationToDelete.id);
+    setErrorMessage("");
+
+    try {
+      await api.delete(`/careers/admin/applications/${applicationToDelete.id}`);
+
+      const remainingOnPage = applications.filter((item) => item.id !== applicationToDelete.id);
+      if (remainingOnPage.length === 0 && pagination.page > 1) {
+        setFilters((prev) => ({ ...prev, page: prev.page - 1 }));
+      } else {
+        setApplications(remainingOnPage);
+        setPagination((prev) => ({
+          ...prev,
+          total: Math.max(prev.total - 1, 0),
+          totalPages: Math.max(1, Math.ceil(Math.max(prev.total - 1, 0) / prev.pageSize)),
+        }));
+      }
+    } catch (err) {
+      setErrorMessage(err.response?.data?.error || "Failed to delete application.");
+    } finally {
+      setDeletingApplicationId("");
+      setShowDeleteConfirm(false);
+      setApplicationToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setApplicationToDelete(null);
   };
 
   const handleRoleFormChange = (event) => {
@@ -459,18 +502,19 @@ export default function AdminApplications() {
                 <th className="px-4 py-3">Applied At</th>
                 <th className="px-4 py-3">Resume</th>
                 <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-300">Loading applications...</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-300">Loading applications...</td>
                 </tr>
               )}
 
               {!loading && applications.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">No applications found.</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">No applications found.</td>
                 </tr>
               )}
 
@@ -512,6 +556,16 @@ export default function AdminApplications() {
                       ))}
                     </select>
                   </td>
+                  <td className="px-4 py-4">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteApplication(application)}
+                      disabled={deletingApplicationId === application.id}
+                      className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-200 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {deletingApplicationId === application.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -542,6 +596,46 @@ export default function AdminApplications() {
           </div>
         </div>
       </div>
+
+      {showDeleteConfirm && applicationToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-slate-950 p-6 shadow-2xl">
+            <h2 className="text-xl font-semibold text-white">Delete Application</h2>
+            <p className="mt-2 text-sm text-slate-300">
+              Are you sure you want to delete the application from <span className="font-medium text-white">{applicationToDelete.full_name}</span> for the <span className="font-medium text-white">{applicationToDelete.role_title}</span> role?
+            </p>
+            <p className="mt-3 text-xs text-slate-500">
+              This action cannot be undone. The application and any uploaded resume file will be permanently removed.
+            </p>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={handleCancelDelete}
+                disabled={deletingApplicationId === applicationToDelete.id}
+                className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deletingApplicationId === applicationToDelete.id}
+                className="flex-1 rounded-lg border border-red-600/50 bg-red-600/20 px-4 py-2.5 text-sm font-medium text-red-300 hover:bg-red-600/30 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {deletingApplicationId === applicationToDelete.id ? (
+                  <>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-red-300 border-t-transparent"></span>
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
