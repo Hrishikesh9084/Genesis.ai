@@ -43,7 +43,7 @@ async function sleep(ms) {
 
 const serverlessRuntime = isServerlessRuntime();
 
-const pool = new Pool({
+const poolConfig = {
   connectionString: process.env.DATABASE_URL,
   max: toInt(process.env.DB_POOL_MAX, serverlessRuntime ? 1 : 40),
   min: toInt(process.env.DB_POOL_MIN, serverlessRuntime ? 0 : 5),
@@ -51,9 +51,21 @@ const pool = new Pool({
   connectionTimeoutMillis: toInt(process.env.DB_CONNECTION_TIMEOUT_MS, serverlessRuntime ? 15000 : 5000),
   query_timeout: toInt(process.env.DB_QUERY_TIMEOUT_MS, serverlessRuntime ? 30000 : 15000),
   statement_timeout: toInt(process.env.DB_STATEMENT_TIMEOUT_MS, serverlessRuntime ? 45000 : 20000),
+  maxUses: toInt(process.env.DB_POOL_MAX_USES, 7500),
   keepAlive: true,
   keepAliveInitialDelayMillis: toInt(process.env.DB_KEEPALIVE_INITIAL_DELAY_MS, 10000),
-});
+};
+
+if (String(process.env.DB_SSL || '').toLowerCase() === 'true') {
+  poolConfig.ssl = {
+    rejectUnauthorized: String(process.env.DB_SSL_REJECT_UNAUTHORIZED || 'true').toLowerCase() === 'true',
+  };
+}
+
+// Reuse one pool per runtime to avoid opening duplicate pools during hot reloads and warm serverless invocations.
+const globalPoolKey = '__genesisPgPool';
+const pool = globalThis[globalPoolKey] || new Pool(poolConfig);
+globalThis[globalPoolKey] = pool;
 
 pool.on('error', (err) => {
   console.error('Unexpected database error:', err);
