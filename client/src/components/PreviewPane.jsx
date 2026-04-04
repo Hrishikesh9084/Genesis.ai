@@ -2,37 +2,53 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Monitor, Smartphone, Tablet, RefreshCw, Square, Play, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
 import api from '../services/api';
 
-const STEPS = [
+const PRODUCTION_STEPS = [
+  { key: 'writing', label: 'Writing project files', icon: '1' },
+  { key: 'installing', label: 'Installing dependencies', icon: '2' },
+  { key: 'building', label: 'Building production bundle', icon: '3' },
+  { key: 'starting', label: 'Starting preview gateway', icon: '4' },
+  { key: 'running', label: 'Live', icon: '5' },
+];
+
+const DEVELOPMENT_STEPS = [
   { key: 'writing', label: 'Writing project files', icon: '1' },
   { key: 'installing', label: 'Installing dependencies', icon: '2' },
   { key: 'starting', label: 'Starting servers', icon: '3' },
   { key: 'running', label: 'Live', icon: '4' },
 ];
 
-function getStepIndex(status, step) {
-  if (status === 'running') return 3;
+function getStepIndex(status, step, mode) {
+  if (status === 'running') return mode === 'development' ? 3 : 4;
   if (status === 'installing') return 1;
+  if (status === 'starting' && step?.includes('Building')) return 2;
   if (status === 'starting' && step?.includes('Writing')) return 0;
+  if (status === 'starting' && step?.includes('Starting preview gateway')) return 3;
   if (status === 'starting' && step?.includes('Starting')) return 2;
   if (status === 'starting') return 1;
   return 0;
 }
 
-export default function PreviewPane({ projectId, files }) {
+export default function PreviewPane({ projectId, files, liveReload = false }) {
   const [viewMode, setViewMode] = useState('desktop');
   const [previewStatus, setPreviewStatus] = useState(null);
   const [iframeKey, setIframeKey] = useState(0);
   const [error, setError] = useState(null);
   const pollRef = useRef(null);
   const startedRef = useRef(false);
+  const filesSignature = JSON.stringify(
+    Object.entries(files || {}).sort(([left], [right]) => left.localeCompare(right))
+  );
+  const lastStartedFilesSignatureRef = useRef('');
 
   const startPreview = useCallback(async () => {
     setError(null);
     try {
-      const res = await api.post(`/preview/${projectId}/start`);
+      const res = await api.post(`/preview/${projectId}/start`, { mode: 'production' });
       setPreviewStatus(res.data);
       if (res.data.status !== 'running') {
         startPolling();
+      } else {
+        setIframeKey((k) => k + 1);
       }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to start preview');
@@ -78,16 +94,35 @@ export default function PreviewPane({ projectId, files }) {
     }
   }, []);
 
+  const restartPreview = useCallback(async () => {
+    clearPolling();
+    try {
+      await api.post(`/preview/${projectId}/stop`);
+    } catch (_) {}
+    await startPreview();
+  }, [clearPolling, projectId, startPreview]);
+
   // Auto-start preview on mount
   useEffect(() => {
     if (!startedRef.current && projectId && files && Object.keys(files).length > 0) {
       startedRef.current = true;
+      lastStartedFilesSignatureRef.current = filesSignature;
       startPreview();
     }
     return () => {
       clearPolling();
     };
-  }, [projectId, files]);
+  }, [projectId, filesSignature, startPreview, clearPolling]);
+
+  useEffect(() => {
+    if (!liveReload) return;
+    if (!startedRef.current || !projectId || !files || Object.keys(files).length === 0) return;
+    if (previewStatus?.status !== 'running') return;
+    if (lastStartedFilesSignatureRef.current === filesSignature) return;
+
+    lastStartedFilesSignatureRef.current = filesSignature;
+    restartPreview();
+  }, [filesSignature, liveReload, previewStatus?.status, projectId, restartPreview, files]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -105,7 +140,8 @@ export default function PreviewPane({ projectId, files }) {
 
   const isRunning = previewStatus?.status === 'running';
   const isLoading = previewStatus && !isRunning && previewStatus.status !== 'error' && previewStatus.status !== 'stopped';
-  const currentStep = previewStatus ? getStepIndex(previewStatus.status, previewStatus.step) : -1;
+  const currentStep = previewStatus ? getStepIndex(previewStatus.status, previewStatus.step, previewStatus.mode) : -1;
+  const steps = previewStatus?.mode === 'development' ? DEVELOPMENT_STEPS : PRODUCTION_STEPS;
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -165,7 +201,7 @@ export default function PreviewPane({ projectId, files }) {
               className="btn-primary text-xs py-1 px-3 flex items-center space-x-1.5"
             >
               <Play className="w-3.5 h-3.5" />
-              <span>Start Preview</span>
+              <span>Start Production Preview</span>
             </button>
           )}
           <div className="flex items-center space-x-1.5">
@@ -193,20 +229,20 @@ export default function PreviewPane({ projectId, files }) {
             <div className="max-w-md w-full p-8">
               <div className="text-center mb-8">
                 <Loader2 className="w-12 h-12 text-orange-500 animate-spin mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white mb-1">Starting Live Preview</h3>
+                <h3 className="text-lg font-semibold text-white mb-1">Starting Production Preview</h3>
                 <p className="text-sm text-gray-400">
-                  Building and running your full-stack app...
+                  Building the generated app and serving it through a production gateway...
                 </p>
               </div>
 
               {/* Progress steps */}
               <div className="space-y-4">
-                {STEPS.map((s, i) => {
+                {steps.map((s, i) => {
                   const isDone = i < currentStep;
                   const isCurrent = i === currentStep;
                   return (
                     <div key={s.key} className="flex items-center space-x-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
                         isDone ? 'bg-green-500/20 text-green-400' :
                         isCurrent ? 'bg-orange-500/20 text-orange-400' :
                         'bg-gray-800 text-gray-600'
@@ -227,7 +263,7 @@ export default function PreviewPane({ projectId, files }) {
               </div>
 
               <p className="text-xs text-gray-500 text-center mt-6">
-                First run takes 30-60s to install dependencies. Subsequent runs are faster.
+                First run takes longer because the app is built before previewing. Subsequent runs are faster.
               </p>
             </div>
           </div>
@@ -247,13 +283,13 @@ export default function PreviewPane({ projectId, files }) {
           <div className="flex items-center justify-center h-full">
             <div className="text-center p-8">
               <Monitor className="w-12 h-12 text-gray-700 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Live Preview</h3>
+              <h3 className="text-lg font-semibold mb-2">Production Preview</h3>
               <p className="text-sm text-gray-400 mb-4">
-                Run your full-stack project with connected frontend and backend.
+                Build and view the generated app the way it would run in production.
               </p>
               <button onClick={startPreview} className="btn-primary inline-flex items-center space-x-2">
                 <Play className="w-5 h-5" />
-                <span>Start Preview</span>
+                <span>Start Production Preview</span>
               </button>
             </div>
           </div>

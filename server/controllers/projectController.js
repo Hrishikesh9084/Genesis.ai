@@ -74,6 +74,14 @@ const createProject = async (req, res, next) => {
     );
 
     const project = result.rows[0];
+    const previewFiles = aiGenerator.buildPreviewSkeleton(prompt);
+
+    await db.query('UPDATE projects SET files = $1, updated_at = NOW() WHERE id = $2', [
+      JSON.stringify(previewFiles),
+      project.id,
+    ]);
+
+    project.files = previewFiles;
 
     generateProjectAsync(project.id, prompt, stack || 'nextjs-express', selectedModel);
 

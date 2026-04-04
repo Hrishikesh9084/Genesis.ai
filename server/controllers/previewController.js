@@ -21,7 +21,9 @@ const startPreview = async (req, res, next) => {
     }
 
     // Start preview async — return immediately so client can poll
-    previewRunner.startPreview(id, project.files).catch((err) => {
+    const mode = req.body?.mode === 'development' ? 'development' : 'production';
+
+    previewRunner.startPreview(id, project.files, { mode }).catch((err) => {
       console.error('Preview start error:', err.message);
     });
 

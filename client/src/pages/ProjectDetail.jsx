@@ -6,6 +6,7 @@ import { saveAs } from 'file-saver';
 import api from '../services/api';
 import FileTree from '../components/FileTree';
 import CodeEditor from '../components/CodeEditor';
+import PreviewPane from '../components/PreviewPane';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 
@@ -17,6 +18,14 @@ export default function ProjectDetail() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState({});
   const [saving, setSaving] = useState(false);
+  const [activeView, setActiveView] = useState('code');
+
+  useEffect(() => {
+    if (selectedFile && !files[selectedFile]) {
+      const firstFile = Object.keys(files)[0] || null;
+      setSelectedFile(firstFile);
+    }
+  }, [files, selectedFile]);
 
   useEffect(() => {
     fetchProject();
@@ -106,31 +115,72 @@ export default function ProjectDetail() {
   if (!project) return null;
 
   if (project.status === 'generating') {
+    const filePaths = Object.keys(files);
+    const generationSummary = filePaths.length > 0
+      ? `Previewing ${filePaths.length} seeded file${filePaths.length === 1 ? '' : 's'} while the AI finishes the final build.`
+      : 'Seeding the project preview workspace...';
+
     return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <div className="card py-16">
-          <Loader2 className="w-16 h-16 text-orange-500 animate-spin mx-auto mb-6" />
-          <h2 className="text-2xl font-bold mb-3">Generating Your Project</h2>
-          <p className="text-gray-400 mb-2">Our AI is building your full-stack application...</p>
-          <p className="text-gray-500 text-sm">This usually takes 30-60 seconds.</p>
-          <div className="mt-8 flex justify-center">
-            <div className="flex space-x-1">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="w-2 h-2 bg-orange-500 rounded-full animate-bounce"
-                  style={{ animationDelay: `${i * 100}ms` }}
-                />
-              ))}
+      <div className="h-[calc(100vh-128px)] flex flex-col min-h-0">
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="min-w-0">
+              <h1 className="text-lg font-semibold truncate max-w-50">{project.name}</h1>
+              <p className="text-xs text-gray-500 mt-0.5">Generating your project in a live production workspace</p>
             </div>
+            <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-300 border border-orange-500/20">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Generating
+            </span>
           </div>
           <button
             onClick={handleStopGeneration}
-            className="mt-8 inline-flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+            className="inline-flex items-center space-x-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
           >
             <X className="w-4 h-4" />
             <span>Stop Generation</span>
           </button>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-hidden bg-gray-950">
+          <div className="grid h-full gap-4 p-4 xl:grid-cols-[280px_minmax(0,1.1fr)_minmax(0,1fr)]">
+            <div
+              data-lenis-prevent
+              className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-800 bg-gray-900/70"
+            >
+              <div className="border-b border-gray-800 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Live files</p>
+                    <p className="text-sm text-gray-300 mt-1">{filePaths.length} file{filePaths.length === 1 ? '' : 's'} visible</p>
+                  </div>
+                  <span className="text-[11px] px-2 py-1 rounded-full bg-gray-800 text-gray-400">Read only</span>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">{generationSummary}</p>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
+              </div>
+            </div>
+
+            <div className="min-h-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
+              {selectedFile ? (
+                <CodeEditor
+                  filePath={selectedFile}
+                  content={files[selectedFile] || ''}
+                  readOnly
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center text-gray-500">
+                  Waiting for the first generated file...
+                </div>
+              )}
+            </div>
+
+            <div className="min-h-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
+              <PreviewPane projectId={id} files={files} liveReload />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -175,18 +225,30 @@ export default function ProjectDetail() {
   const fileCount = Object.keys(files).length;
 
   return (
-    <div className="h-[calc(100vh-128px)] flex flex-col">
+    <div className="h-[calc(100vh-128px)] flex flex-col min-h-0">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center space-x-4">
-          <h1 className="text-lg font-semibold truncate max-w-[200px]">{project.name}</h1>
+          <h1 className="text-lg font-semibold truncate max-w-50">{project.name}</h1>
           <span className="text-xs text-gray-500">{fileCount} files</span>
 
           <div className="flex items-center bg-gray-800 rounded-lg p-0.5">
-            <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-sm bg-orange-600 text-white">
+            <button
+              type="button"
+              onClick={() => setActiveView('code')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${activeView === 'code' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
               <Code className="w-4 h-4" />
               <span>Code</span>
-            </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView('preview')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${activeView === 'preview' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              <Rocket className="w-4 h-4" />
+              <span>Preview</span>
+            </button>
           </div>
         </div>
 
@@ -212,32 +274,40 @@ export default function ProjectDetail() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* File tree sidebar */}
-        <div
-          data-lenis-prevent
-          className="w-64 bg-gray-900 border-r border-gray-800 overflow-y-auto overscroll-contain shrink-0"
-        >
-          <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Files
-          </div>
-          <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
-        </div>
-
-        {/* Code editor */}
-        <div className="flex-1 overflow-hidden">
-          {selectedFile ? (
-            <CodeEditor
-              filePath={selectedFile}
-              content={files[selectedFile] || ''}
-              onChange={handleFileChange}
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              Select a file to view
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {activeView === 'code' ? (
+          <>
+            {/* File tree sidebar */}
+            <div
+              data-lenis-prevent
+              className="w-64 bg-gray-900 border-r border-gray-800 overflow-y-auto overscroll-contain shrink-0 min-h-0"
+            >
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Files
+              </div>
+              <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
             </div>
-          )}
-        </div>
+
+            {/* Code editor */}
+            <div className="flex-1 overflow-hidden min-h-0">
+              {selectedFile ? (
+                <CodeEditor
+                  filePath={selectedFile}
+                  content={files[selectedFile] || ''}
+                  onChange={handleFileChange}
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  Select a file to view
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 overflow-hidden min-h-0">
+            <PreviewPane projectId={id} files={files} />
+          </div>
+        )}
       </div>
     </div>
   );

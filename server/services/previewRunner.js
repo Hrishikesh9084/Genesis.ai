@@ -1,3 +1,4 @@
+import express from 'express';
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -18,6 +19,17 @@ function resolvePreviewsDir() {
 const PREVIEWS_DIR = resolvePreviewsDir();
 fs.mkdirSync(PREVIEWS_DIR, { recursive: true });
 const activePreviews = new Map();
+const DEFAULT_PREVIEW_MODE = 'production';
+const HOP_BY_HOP_HEADERS = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailers',
+  'transfer-encoding',
+  'upgrade',
+]);
 
 function getFreePort() {
   return new Promise((resolve, reject) => {
@@ -66,6 +78,101 @@ function getScriptCommand(pkg, preferredScripts) {
   return name || null;
 }
 
+function readStream(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+    stream.on('error', reject);
+  });
+}
+
+function getBuildOutputDir(clientDir) {
+  const distDir = path.join(clientDir, 'dist');
+  if (fs.existsSync(distDir)) return distDir;
+
+  const buildDir = path.join(clientDir, 'build');
+  if (fs.existsSync(buildDir)) return buildDir;
+
+  return distDir;
+}
+
+async function proxyApiRequest(req, res, backendPort) {
+  const targetUrl = new URL(req.originalUrl, `http://127.0.0.1:${backendPort}`);
+  const method = req.method || 'GET';
+  const body = ['GET', 'HEAD'].includes(method) ? undefined : await readStream(req);
+  const headers = { ...req.headers };
+
+  delete headers.host;
+  delete headers.connection;
+  delete headers['content-length'];
+  delete headers['transfer-encoding'];
+
+  const response = await fetch(targetUrl, {
+    method,
+    headers,
+    body,
+  });
+
+  res.status(response.status);
+  response.headers.forEach((value, key) => {
+    if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) {
+      res.setHeader(key, value);
+    }
+  });
+
+  const responseBody = Buffer.from(await response.arrayBuffer());
+  res.send(responseBody);
+}
+
+async function startPreviewGateway({ projectDir, clientDir, backendPort, gatewayPort }) {
+  const resolvedGatewayPort = gatewayPort || await getFreePort();
+  const buildDir = getBuildOutputDir(clientDir);
+  const staticIndex = path.join(buildDir, 'index.html');
+
+  if (!fs.existsSync(staticIndex)) {
+    throw new Error(`Production build output not found at ${staticIndex}.`);
+  }
+
+  const app = express();
+
+  app.use('/api', (req, res) => {
+    proxyApiRequest(req, res, backendPort).catch((error) => {
+      console.error('[preview:gateway] API proxy failed:', error.message);
+      if (!res.headersSent) {
+        res.status(502).json({ error: 'Production preview backend is unavailable.' });
+      }
+    });
+  });
+
+  app.use(express.static(buildDir, { extensions: ['html'] }));
+
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      return next();
+    }
+
+    res.sendFile(staticIndex);
+  });
+
+  const server = await new Promise((resolve, reject) => {
+    const previewServer = app.listen(resolvedGatewayPort, '127.0.0.1', () => resolve(previewServer));
+    previewServer.on('error', reject);
+  });
+
+  return {
+    server,
+    gatewayPort: resolvedGatewayPort,
+    frontendUrl: `http://127.0.0.1:${resolvedGatewayPort}`,
+    buildDir,
+    projectDir,
+  };
+}
+
 function killProc(proc) {
   if (!proc || proc.killed) return;
   try {
@@ -98,29 +205,20 @@ function updateStatus(projectId, status, step, extra = {}) {
   activePreviews.set(projectId, { ...prev, status, step, ...extra });
 }
 
-const startPreview = async (projectId, files) => {
-  if (activePreviews.has(projectId)) {
-    const existing = activePreviews.get(projectId);
-    if (existing.status === 'running') return existing;
-    if (existing.status === 'starting' || existing.status === 'installing') return existing;
-    await stopPreview(projectId);
-  }
-
-  const projectDir = path.join(PREVIEWS_DIR, projectId);
+async function startDevelopmentPreview(projectId, files, projectDir) {
   let backendProc = null;
   let frontendProc = null;
-  updateStatus(projectId, 'starting', 'Writing project files...');
+
+  updateStatus(projectId, 'starting', 'Writing project files...', { mode: 'development' });
 
   try {
-    // Step 1: Write files
     if (fs.existsSync(projectDir)) {
       fs.rmSync(projectDir, { recursive: true, force: true });
     }
     fs.mkdirSync(projectDir, { recursive: true });
     writeFiles(projectDir, files);
-    updateStatus(projectId, 'installing', 'Installing dependencies...');
+    updateStatus(projectId, 'installing', 'Installing dependencies...', { mode: 'development' });
 
-    // Get ports
     const backendPort = await getFreePort();
     const frontendPort = await getFreePort();
 
@@ -129,7 +227,6 @@ const startPreview = async (projectId, files) => {
     const hasClient = fs.existsSync(path.join(clientDir, 'package.json'));
     const hasServer = fs.existsSync(path.join(serverDir, 'package.json'));
 
-    // Step 2: Install dependencies
     if (hasClient) {
       await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], clientDir);
     }
@@ -137,7 +234,6 @@ const startPreview = async (projectId, files) => {
       await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], serverDir);
     }
 
-    // Ensure preview proxy works even when generated client has no vite config.
     if (hasClient && !fs.existsSync(path.join(clientDir, 'vite.config.js'))) {
       const viteConfig = `import { defineConfig } from 'vite';
 
@@ -158,9 +254,8 @@ export default defineConfig({
       fs.writeFileSync(path.join(clientDir, 'vite.config.js'), viteConfig);
     }
 
-    updateStatus(projectId, 'starting', 'Starting servers...');
+    updateStatus(projectId, 'starting', 'Starting servers...', { mode: 'development' });
 
-    // Step 3: Start backend
     let backendLogs = '';
     if (hasServer) {
       const serverPkg = readPackageJson(serverDir);
@@ -221,7 +316,6 @@ export default defineConfig({
       }
     }
 
-    // Step 4: Start frontend dev server
     let frontendLogs = '';
     if (hasClient) {
       const clientPkg = readPackageJson(clientDir);
@@ -257,7 +351,6 @@ export default defineConfig({
       });
     }
 
-    // Wait for frontend to be ready
     if (hasClient) {
       try {
         await waitForPort(frontendPort, 90000);
@@ -271,6 +364,7 @@ export default defineConfig({
 
     activePreviews.set(projectId, {
       status: 'running',
+      mode: 'development',
       step: 'Live',
       backendProc,
       frontendProc,
@@ -287,9 +381,169 @@ export default defineConfig({
     killProc(backendProc);
     killProc(frontendProc);
     console.error(`[preview:${projectId}] Failed:`, err.message);
-    updateStatus(projectId, 'error', err.message);
+    updateStatus(projectId, 'error', err.message, { mode: 'development' });
     throw err;
   }
+}
+
+async function startProductionPreview(projectId, files, projectDir) {
+  let backendProc = null;
+  let gatewayServer = null;
+
+  updateStatus(projectId, 'starting', 'Writing project files...', { mode: 'production' });
+
+  try {
+    if (fs.existsSync(projectDir)) {
+      fs.rmSync(projectDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(projectDir, { recursive: true });
+    writeFiles(projectDir, files);
+    updateStatus(projectId, 'installing', 'Installing dependencies...', { mode: 'production' });
+
+    const backendPort = await getFreePort();
+    const clientDir = path.join(projectDir, 'client');
+    const serverDir = path.join(projectDir, 'server');
+    const hasClient = fs.existsSync(path.join(clientDir, 'package.json'));
+    const hasServer = fs.existsSync(path.join(serverDir, 'package.json'));
+    const gatewayPort = await getFreePort();
+    const previewUrl = `http://127.0.0.1:${gatewayPort}`;
+
+    if (hasClient) {
+      await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], clientDir);
+    }
+    if (hasServer) {
+      await runCmd('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', '--legacy-peer-deps'], serverDir);
+    }
+
+    if (hasClient) {
+      updateStatus(projectId, 'starting', 'Building production bundle...', { mode: 'production' });
+      await runCmd('npm', ['run', 'build'], clientDir, {
+        VITE_API_BASE_URL: '/api',
+        NODE_ENV: 'production',
+      });
+    }
+
+    let backendLogs = '';
+    if (hasServer) {
+      const serverPkg = readPackageJson(serverDir);
+      const entry = ['index.js', 'server.js', 'app.js'].find(
+        (f) => fs.existsSync(path.join(serverDir, f))
+      ) || 'index.js';
+
+      const buildScript = getScriptCommand(serverPkg, ['build']);
+      if (buildScript) {
+        await runCmd('npm', ['run', buildScript], serverDir, {
+          NODE_ENV: 'production',
+          PORT: String(backendPort),
+          CLIENT_URL: previewUrl,
+          API_URL: previewUrl,
+        });
+      }
+
+      const backendCandidates = [];
+      if (serverPkg?.scripts?.start) backendCandidates.push({ command: 'npm', args: ['run', 'start'], label: 'npm run start' });
+      if (backendCandidates.length === 0) {
+        backendCandidates.push({ command: 'node', args: [entry], label: `node ${entry}` });
+      }
+
+      let lastBackendError = null;
+      for (const candidate of backendCandidates) {
+        backendProc = spawn(candidate.command, candidate.args, {
+          cwd: serverDir,
+          shell: true,
+          stdio: 'pipe',
+          env: {
+            ...process.env,
+            PORT: String(backendPort),
+            NODE_ENV: 'production',
+            CLIENT_URL: previewUrl,
+            API_URL: previewUrl,
+            DATABASE_URL: process.env.DATABASE_URL || '',
+          },
+        });
+
+        backendProc.stdout.on('data', (d) => {
+          const line = d.toString();
+          backendLogs += line;
+          if (backendLogs.length > 6000) backendLogs = backendLogs.slice(-6000);
+          console.log(`[preview:backend:${projectId}] ${line.trim()}`);
+        });
+        backendProc.stderr.on('data', (d) => {
+          const line = d.toString();
+          backendLogs += line;
+          if (backendLogs.length > 6000) backendLogs = backendLogs.slice(-6000);
+          console.log(`[preview:backend:${projectId}] ${line.trim()}`);
+        });
+        backendProc.on('exit', (code) => {
+          console.log(`[preview:backend:${projectId}] exited with code ${code}`);
+        });
+
+        try {
+          await waitForPort(backendPort, 45000);
+          lastBackendError = null;
+          break;
+        } catch {
+          lastBackendError = new Error(`Backend command '${candidate.label}' failed to open port ${backendPort}.`);
+          killProc(backendProc);
+          backendProc = null;
+        }
+      }
+
+      if (lastBackendError) {
+        throw new Error(`Backend failed to start. ${backendLogs.trim() || lastBackendError.message}`);
+      }
+    }
+
+    const clientBuildDir = hasClient ? getBuildOutputDir(clientDir) : null;
+    updateStatus(projectId, 'starting', 'Starting preview gateway...', { mode: 'production' });
+    gatewayServer = await startPreviewGateway({
+      projectDir,
+      clientDir,
+      backendPort,
+      gatewayPort,
+    });
+
+    activePreviews.set(projectId, {
+      status: 'running',
+      mode: 'production',
+      step: 'Live',
+      backendProc,
+      gatewayServer: gatewayServer.server,
+      backendPort,
+      previewPort: gatewayServer.gatewayPort,
+      frontendPort: gatewayServer.gatewayPort,
+      frontendUrl: gatewayServer.frontendUrl,
+      backendUrl: hasServer ? `http://localhost:${backendPort}` : null,
+      buildDir: clientBuildDir,
+      dir: projectDir,
+      startedAt: Date.now(),
+    });
+
+    return activePreviews.get(projectId);
+  } catch (err) {
+    killProc(backendProc);
+    if (gatewayServer?.server) {
+      gatewayServer.server.close?.();
+    }
+    console.error(`[preview:${projectId}] Failed:`, err.message);
+    updateStatus(projectId, 'error', err.message, { mode: 'production' });
+    throw err;
+  }
+}
+
+const startPreview = async (projectId, files, options = {}) => {
+  const mode = options.mode === 'development' ? 'development' : DEFAULT_PREVIEW_MODE;
+  if (activePreviews.has(projectId)) {
+    const existing = activePreviews.get(projectId);
+    if (existing.status === 'running' && existing.mode === mode) return existing;
+    if ((existing.status === 'starting' || existing.status === 'installing') && existing.mode === mode) return existing;
+    await stopPreview(projectId);
+  }
+
+  const projectDir = path.join(PREVIEWS_DIR, projectId);
+  return mode === 'development'
+    ? startDevelopmentPreview(projectId, files, projectDir)
+    : startProductionPreview(projectId, files, projectDir);
 };
 
 const stopPreview = async (projectId) => {
@@ -297,6 +551,9 @@ const stopPreview = async (projectId) => {
   if (!preview) return;
   killProc(preview.backendProc);
   killProc(preview.frontendProc);
+  if (preview.gatewayServer) {
+    preview.gatewayServer.close?.();
+  }
   activePreviews.delete(projectId);
 };
 
@@ -306,6 +563,7 @@ const getStatus = (projectId) => {
   return {
     status: preview.status,
     step: preview.step,
+    mode: preview.mode || DEFAULT_PREVIEW_MODE,
     frontendUrl: preview.frontendUrl || null,
     backendUrl: preview.backendUrl || null,
   };

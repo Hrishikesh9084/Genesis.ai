@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Sparkles, ArrowLeft, Loader2, Lightbulb, Cpu } from 'lucide-react';
 import api from '../services/api';
@@ -32,6 +32,21 @@ export default function EditProject() {
   const [model, setModel] = useState('');
   const [providers, setProviders] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!isModelDropdownOpen) return undefined;
+
+    const onDocumentClick = (event) => {
+      if (!modelDropdownRef.current?.contains(event.target)) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onDocumentClick);
+    return () => document.removeEventListener('mousedown', onDocumentClick);
+  }, [isModelDropdownOpen]);
 
   useEffect(() => {
     fetchProject();
@@ -111,6 +126,15 @@ export default function EditProject() {
   if (loading) return <LoadingSpinner text="Loading project..." />;
   if (!project) return null;
 
+  let selectedModelLabel = 'Select an AI model';
+  for (const provider of Object.values(providers)) {
+    const found = provider.models?.find((m) => m.id === model);
+    if (found) {
+      selectedModelLabel = found.name;
+      break;
+    }
+  }
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <Link to={`/project/${id}`} className="inline-flex items-center space-x-2 text-gray-400 hover:text-white mb-6 transition-colors">
@@ -155,43 +179,59 @@ export default function EditProject() {
               AI Model
             </span>
           </label>
-          <div className="space-y-4">
-            {Object.entries(providers).map(([key, provider]) => (
-              <div key={key}>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{provider.label}</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {provider.models.map((m) => {
-                    const selected = model === m.id;
-                    const disabled = !isModelAllowed(m.id);
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          if (!disabled) setModel(m.id);
-                        }}
-                        disabled={disabled}
-                        className={`text-left p-3 rounded-xl border-2 transition-all ${
-                          selected
-                            ? 'border-orange-500 bg-orange-500/10'
-                            : disabled
-                              ? 'border-gray-800 bg-gray-900/40 text-gray-500 cursor-not-allowed opacity-60'
-                              : 'border-gray-700/60 bg-gray-800/40 hover:border-gray-600'
-                        }`}
-                        aria-disabled={disabled}
-                      >
-                        <div className={`text-sm font-medium ${selected ? 'text-orange-400' : 'text-gray-200'}`}>
-                          {m.name}
-                        </div>
-                        {m.desc && <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>}
-                        {disabled && <div className="text-[11px] text-gray-600 mt-1">Disabled</div>}
-                      </button>
-                    );
-                  })}
-                </div>
+          <div ref={modelDropdownRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setIsModelDropdownOpen((open) => !open)}
+              className="input-field w-full text-left flex items-center justify-between"
+              aria-haspopup="listbox"
+              aria-expanded={isModelDropdownOpen}
+            >
+              <span className="truncate">{selectedModelLabel}</span>
+              <span className={`text-xs text-gray-500 transition-transform ${isModelDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
+            </button>
+
+            {isModelDropdownOpen && (
+              <div
+                data-lenis-prevent
+                className="mt-2 max-h-72 overflow-y-auto overscroll-contain rounded-xl border border-gray-700 bg-gray-900 shadow-2xl"
+              >
+                {Object.entries(providers).map(([key, provider]) => (
+                  <div key={key} className="p-2">
+                    <p className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">{provider.label}</p>
+                    {provider.models.map((m) => {
+                      const disabled = !isModelAllowed(m.id);
+                      const selected = model === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            if (disabled) return;
+                            setModel(m.id);
+                            setIsModelDropdownOpen(false);
+                          }}
+                          disabled={disabled}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                            selected
+                              ? 'bg-orange-500/15 text-orange-300'
+                              : disabled
+                                ? 'text-gray-500 opacity-60 cursor-not-allowed'
+                                : 'text-gray-200 hover:bg-gray-800'
+                          }`}
+                        >
+                          {m.name}{disabled ? ' (Disabled)' : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
+          <p className="text-xs text-gray-500 mt-2">
+            Choose Gemini 2.5 Pro or any Mistral model for edits.
+          </p>
         </div>
 
         <div className="card">

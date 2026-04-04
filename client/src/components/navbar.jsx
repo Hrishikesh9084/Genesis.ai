@@ -1,7 +1,7 @@
 import { MenuIcon, XIcon, ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Logo from "./Logo";
 import NetworkStatus from "./NetworkStatus";
@@ -38,7 +38,10 @@ function UserAvatar({ user, sizeClass = "w-8 h-8" }) {
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState(null);
+  const dropdownContainerRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   const publicLinks = [
@@ -77,8 +80,8 @@ export default function Navbar() {
     {
       name: "Careers",
       links: [
-        { name: "Open Roles", href: "/careers" },
-        { name: "Apply", href: "/careers/apply" },
+        { name: "Job Openings", href: "/careers" },
+        // { name: "Apply", href: "/careers/apply" },
         { name: "Track Status", href: "/careers/status" },
       ],
     },
@@ -126,6 +129,28 @@ export default function Navbar() {
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    setActiveDropdown(null);
+    setIsOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        dropdownContainerRef.current &&
+        !dropdownContainerRef.current.contains(event.target)
+      ) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
@@ -180,7 +205,7 @@ export default function Navbar() {
 
         <div className="hidden items-center space-x-8 md:flex">
           {user ? (
-            <div className="flex items-center gap-5">
+            <div ref={dropdownContainerRef} className="flex items-center gap-5">
               {loggedInTopLinks.map((link) => (
                 <Link
                   key={`top-${link.name}`}
@@ -195,17 +220,35 @@ export default function Navbar() {
                 <div key={section.name} className="group relative">
                   <button
                     type="button"
+                    onClick={() =>
+                      setActiveDropdown((current) =>
+                        current === section.name ? null : section.name,
+                      )
+                    }
                     className="inline-flex items-center gap-1 text-sm text-gray-300 transition hover:text-orange-400"
                   >
                     <span>{section.name}</span>
-                    <ChevronDown className="h-4 w-4 text-gray-500 transition group-hover:text-orange-400" />
+                    <ChevronDown
+                      className={`h-4 w-4 text-gray-500 transition ${
+                        activeDropdown === section.name
+                          ? "rotate-180 text-orange-400"
+                          : "group-hover:text-orange-400"
+                      }`}
+                    />
                   </button>
 
-                  <div className="invisible absolute left-0 top-full z-50 mt-3 min-w-48 rounded-xl border border-gray-700 bg-gray-900/95 p-2 opacity-0 shadow-2xl backdrop-blur-lg transition duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                  <div
+                    className={`absolute left-0 top-full z-50 mt-3 min-w-48 rounded-xl border border-gray-700 bg-gray-900/95 p-2 shadow-2xl backdrop-blur-lg transition duration-150 ${
+                      activeDropdown === section.name
+                        ? "visible opacity-100"
+                        : "invisible opacity-0"
+                    }`}
+                  >
                     {section.links.map((link) => (
                       <Link
                         key={`${section.name}-${link.name}`}
                         to={link.href}
+                        onClick={() => setActiveDropdown(null)}
                         className="block rounded-lg px-3 py-2 text-sm text-gray-200 transition hover:bg-gray-800 hover:text-orange-300"
                       >
                         {link.name}
@@ -237,13 +280,13 @@ export default function Navbar() {
                   event.stopPropagation();
                   navigate("/plans");
                 }}
-                className="px-5 text-sm py-2.5 text-white rounded-full font-medium bg-transparent border border-orange-500 cursor-pointer"
+                className="px-7 text-sm py-3.5 text-white rounded-full font-medium bg-transparent border border-orange-500 cursor-pointer"
                 title="Buy credits"
               >
                 {Number(user?.credits || 0)} credits
               </button>
               <UserAvatar user={user} />
-              <span className="text-sm text-gray-300 max-w-24 truncate">
+              <span className="p-2  text-sm text-gray-300 max-w-24 truncate">
                 {user.name}
               </span>
             </button>

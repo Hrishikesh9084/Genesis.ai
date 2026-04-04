@@ -491,6 +491,16 @@ app.get('/api/health', (req, res) => {
   return output;
 }
 
+function buildPreviewSkeleton(prompt) {
+  return ensureCoreFiles(
+    {
+      'client/package.json': fallbackClientPackage(),
+      'server/package.json': fallbackServerPackage(),
+    },
+    prompt
+  );
+}
+
 function parseAndValidateFiles(content, prompt) {
   const json = extractJsonObject(content);
   const normalized = normalizeFilesMap(json);
@@ -708,9 +718,10 @@ Apply the requested changes to the project. Return the COMPLETE updated project 
 const aiGenerator = {
   DEFAULT_MODEL,
   getAvailableModels,
+  buildPreviewSkeleton,
   generateProject,
   editProject,
 };
 
-export { DEFAULT_MODEL, getAvailableModels, generateProject, editProject };
+export { DEFAULT_MODEL, getAvailableModels, buildPreviewSkeleton, generateProject, editProject };
 export default aiGenerator;

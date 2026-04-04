@@ -34,7 +34,7 @@ export default function CodeEditor({ filePath, content, onChange, readOnly = fal
   const lines = (localContent || '').split('\n');
 
   return (
-    <div data-lenis-prevent className="flex flex-col h-full bg-gray-950 rounded-lg overflow-hidden border border-gray-800 overscroll-contain">
+    <div data-lenis-prevent className="flex flex-col h-full min-h-0 bg-gray-950 rounded-lg overflow-hidden border border-gray-800 ">
       <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center space-x-2">
           <span className="text-sm text-gray-400 font-mono">{filePath}</span>
@@ -44,8 +44,8 @@ export default function CodeEditor({ filePath, content, onChange, readOnly = fal
           {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
         </button>
       </div>
-      <div data-lenis-prevent className="flex flex-1 overflow-auto overscroll-contain">
-        <div className="flex flex-col items-end py-3 px-3 bg-gray-950 border-r border-gray-800 select-none">
+      <div data-lenis-prevent className="flex flex-1 min-h-0 overflow-hidden overscroll-contain">
+        <div className="flex flex-col items-end py-3 px-3 bg-gray-950 border-r border-gray-800 select-none ">
           {lines.map((_, i) => (
             <span key={i} className="text-xs text-gray-600 leading-6 font-mono">{i + 1}</span>
           ))}
@@ -55,7 +55,7 @@ export default function CodeEditor({ filePath, content, onChange, readOnly = fal
           onChange={handleChange}
           readOnly={readOnly}
           spellCheck={false}
-          className="flex-1 p-3 bg-transparent text-sm font-mono text-gray-200 leading-6 resize-none focus:outline-none whitespace-pre overflow-auto overscroll-contain"
+          className="flex-1 min-h-0 p-3 bg-transparent text-sm font-mono text-gray-200 leading-6 resize-none focus:outline-none whitespace-pre overflow-y-auto overscroll-contain"
           style={{ tabSize: 2 }}
         />
       </div>
