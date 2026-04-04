@@ -377,7 +377,7 @@ const Logo = ({
     }
   );
 
-  const baseTw = 'inline-block whitespace-normal break-words will-change-transform uppercase text-[3rem] leading-none';
+  const baseTw = 'inline-block whitespace-normal break-words will-change-transform text-[3rem] leading-none';
   const classes = useMemo(
     () => `${baseTw} ${ready ? 'visible' : 'invisible'} ${className}`.trim(),
     [baseTw, ready, className]

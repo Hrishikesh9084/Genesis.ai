@@ -1,9 +1,3 @@
-import {
-  DribbbleIcon,
-  GithubIcon,
-  LinkedinIcon,
-  TwitterIcon,
-} from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import Logo from "./Logo";
@@ -82,7 +76,7 @@ export default function Footer() {
           <Link to="/" onClick={()=>scrollTo(0,0)}>
             <Logo
               className="text-2xl"
-              text="Genesis.ai"
+              text="GENESIS"
               shuffleDirection="right"
               duration={0.35}
               animationMode="evenodd"
