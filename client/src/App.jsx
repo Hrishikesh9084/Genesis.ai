@@ -30,6 +30,8 @@ const Contact = lazy(() => import("./pages/Contact"));
 const Careers = lazy(() => import("./pages/Careers"));
 const CareersApply = lazy(() => import("./pages/CareersApply"));
 const CareersStatus = lazy(() => import("./pages/CareersStatus"));
+const MockInterview = lazy(() => import("./pages/MockInterview"));
+const MockInterviewResult = lazy(() => import("./pages/MockInterviewResult"));
 const AdminApplications = lazy(() => import("./pages/AdminApplications"));
 const AdminNewsletter = lazy(() => import("./pages/AdminNewsletter"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -126,6 +128,8 @@ export default function App() {
             <Route path="/careers" element={<Careers />} />
             <Route path="/careers/apply" element={<CareersApply />} />
             <Route path="/careers/status" element={<CareersStatus />} />
+            <Route path="/careers/mock-interview" element={<MockInterview />} />
+            <Route path="/careers/mock-interview/result" element={<MockInterviewResult />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms-of-service" element={<TermsOfService />} />

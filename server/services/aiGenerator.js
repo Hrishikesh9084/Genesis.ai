@@ -55,8 +55,6 @@ const MODEL_CATALOG = {
   google: {
     label: 'Google',
     models: [
-      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', desc: 'Fast & efficient', envKey: 'GEMINI_API_KEY' },
-      { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', desc: 'Lightweight & quick', envKey: 'GEMINI_API_KEY' },
       { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', desc: 'Balanced speed and quality', envKey: 'GEMINI_API_KEY' },
       { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', desc: 'Best Gemini quality', envKey: 'GEMINI_API_KEY' },
     ],
@@ -98,7 +96,8 @@ const MODEL_CATALOG = {
   },
 };
 
-const DEFAULT_MODEL = 'gemini-2.5-pro';
+const DEFAULT_MODEL = 'gemini-2.5-pro'
+;
 
 function getModelInfo(modelId) {
   for (const provider of Object.values(MODEL_CATALOG)) {
@@ -715,13 +714,84 @@ Apply the requested changes to the project. Return the COMPLETE updated project 
   }
 };
 
+function buildModelFallbackSequence(preferredModelId) {
+  const sequence = [];
+  const tried = new Set();
+
+  const addModel = (modelId) => {
+    if (modelId && !tried.has(modelId) && getAllAllowedModelIds().includes(modelId)) {
+      sequence.push(modelId);
+      tried.add(modelId);
+    }
+  };
+
+  // Start with the preferred model
+  addModel(preferredModelId);
+
+  // Add other fast models from different providers
+  addModel('gpt-4o-mini');
+  addModel('gemini-2.5-flash');
+  addModel('claude-3-5-haiku-latest');
+  addModel('mistral-small-latest');
+  addModel('grok-3-mini');
+
+  // Add DEFAULT_MODEL if not already included
+  addModel(DEFAULT_MODEL);
+
+  // Add any remaining available models
+  for (const modelId of getAllAllowedModelIds()) {
+    addModel(modelId);
+  }
+
+  return sequence;
+}
+
+const generateStructuredJson = async ({ systemPrompt, userPrompt, modelName }) => {
+  const modelId = resolveModel(modelName);
+  const fallbackSequence = buildModelFallbackSequence(modelId);
+
+  const callAndParse = async (targetModelId) => {
+    const content = await callModel(targetModelId, String(systemPrompt || '').trim(), String(userPrompt || '').trim());
+    return extractJsonObject(content);
+  };
+
+  let lastError;
+  for (const currentModel of fallbackSequence) {
+    try {
+      const result = await callAndParse(currentModel);
+      // Success - return immediately
+      return result;
+    } catch (err) {
+      lastError = err;
+      const errorMsg = String(err?.message || err).toLowerCase();
+      // Only retry on service errors or network issues, not on bad requests
+      const isRetryable = errorMsg.includes('503') || 
+                         errorMsg.includes('service') ||
+                         errorMsg.includes('timeout') ||
+                         errorMsg.includes('network') ||
+                         errorMsg.includes('econnrefused') ||
+                         (err?.status >= 500);
+      if (!isRetryable && currentModel !== fallbackSequence[0]) {
+        // If this is a client error (not service error), skip retrying other models
+        throw err;
+      }
+      // Continue to next model on retryable errors
+      continue;
+    }
+  }
+
+  // All models failed - throw the last error
+  throw lastError || new Error('All models failed to generate structured response.');
+};
+
 const aiGenerator = {
   DEFAULT_MODEL,
   getAvailableModels,
   buildPreviewSkeleton,
   generateProject,
   editProject,
+  generateStructuredJson,
 };
 
-export { DEFAULT_MODEL, getAvailableModels, buildPreviewSkeleton, generateProject, editProject };
+export { DEFAULT_MODEL, getAvailableModels, buildPreviewSkeleton, generateProject, editProject, generateStructuredJson };
 export default aiGenerator;

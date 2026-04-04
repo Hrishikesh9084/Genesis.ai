@@ -104,6 +104,18 @@ export default function Careers() {
           </div>
         </div>
 
+        <div className="mt-6 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 sm:p-5">
+          <p className="text-sm text-cyan-100">
+            Want to practice before applying? Try the AI real-time voice mock interview using your resume.
+          </p>
+          <Link
+            to="/careers/mock-interview"
+            className="mt-3 inline-flex rounded-xl border border-cyan-400/30 bg-cyan-500/15 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25"
+          >
+            Start Mock Interview
+          </Link>
+        </div>
+
         {loading && (
           <div className="mt-8 rounded-xl border border-white/10 bg-white/3 p-5 text-slate-300">
             Loading open roles...

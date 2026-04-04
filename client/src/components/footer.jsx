@@ -82,7 +82,7 @@ export default function Footer() {
           <Link to="/" onClick={()=>scrollTo(0,0)}>
             <Logo
               className="text-2xl"
-              text="Genesis"
+              text="Genesis.ai"
               shuffleDirection="right"
               duration={0.35}
               animationMode="evenodd"

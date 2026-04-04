@@ -322,6 +322,8 @@ export default function CareersApply() {
           Looking for role details first? <Link className="text-orange-300 hover:text-orange-200" to="/careers">Browse open roles</Link>
           <span className="mx-2 text-slate-500">•</span>
           <Link className="text-orange-300 hover:text-orange-200" to="/careers/status">Track application status</Link>
+          <span className="mx-2 text-slate-500">•</span>
+          <Link className="text-cyan-300 hover:text-cyan-200" to="/careers/mock-interview">Practice AI mock interview</Link>
         </div>
       </div>
     </section>

@@ -532,6 +532,85 @@ function validateAdminUpdateJobRole(req, res, next) {
   next();
 }
 
+function validateStartMockInterview(req, res, next) {
+  const role = String(req.body?.role || '').trim();
+  const model = req.body?.model;
+
+  const fail = (message) => {
+    if (req.file?.path) {
+      fs.promises.unlink(req.file.path).catch(() => {
+        // Ignore cleanup failure for validation errors.
+      });
+    }
+    return badRequest(res, message);
+  };
+
+  if (!req.file) {
+    return fail('Resume file is required.');
+  }
+
+  if (role && role.length > 120) {
+    return fail('role must be 120 characters or fewer.');
+  }
+
+  if (model !== undefined && String(model).trim().length > 80) {
+    return fail('model is invalid.');
+  }
+
+  next();
+}
+
+function validateSuggestMockInterviewRole(req, res, next) {
+  const model = req.body?.model;
+
+  const fail = (message) => {
+    if (req.file?.path) {
+      fs.promises.unlink(req.file.path).catch(() => {
+        // Ignore cleanup failure for validation errors.
+      });
+    }
+    return badRequest(res, message);
+  };
+
+  if (!req.file) {
+    return fail('Resume file is required.');
+  }
+
+  if (model !== undefined && String(model).trim().length > 80) {
+    return fail('model is invalid.');
+  }
+
+  next();
+}
+
+function validateMockInterviewAnswer(req, res, next) {
+  const sessionId = String(req.body?.sessionId || '').trim();
+  const answer = String(req.body?.answer || '').trim();
+  const model = req.body?.model;
+
+  if (!isUuid(sessionId)) {
+    return badRequest(res, 'sessionId must be a valid UUID.');
+  }
+
+  if (!answer) {
+    return badRequest(res, 'answer is required.');
+  }
+
+  if (answer.length < 5) {
+    return badRequest(res, 'answer must be at least 5 characters.');
+  }
+
+  if (answer.length > 3000) {
+    return badRequest(res, 'answer must be 3000 characters or fewer.');
+  }
+
+  if (model !== undefined && String(model).trim().length > 80) {
+    return badRequest(res, 'model is invalid.');
+  }
+
+  next();
+}
+
 export default {
   validateRegister,
   validateLogin,
@@ -557,4 +636,7 @@ export default {
   validateAdminCreateJobRole,
   validateJobRoleIdParam,
   validateAdminUpdateJobRole,
+  validateSuggestMockInterviewRole,
+  validateStartMockInterview,
+  validateMockInterviewAnswer,
 };
