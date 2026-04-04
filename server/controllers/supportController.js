@@ -106,7 +106,7 @@ const APP_KNOWLEDGE = [
     key: 'careers-flow',
     tags: ['careers', 'jobs', 'apply', 'application status', 'shortlisted', 'hired'],
     content:
-      'Careers features: browse open roles, apply with resume, track status by application id + email, and receive status emails for shortlisted/hired/rejected updates.',
+      'Careers features: browse open roles, apply with resume, track status by application id + email, practice the AI mock interview flow, manage job roles from admin screens, and receive status emails for shortlisted/hired/rejected updates.',
   },
   {
     key: 'auth-flow',

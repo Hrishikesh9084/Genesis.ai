@@ -143,9 +143,8 @@ const featureGroups = [
     icon: CircleHelp,
     items: [
       "Send messages through the contact form",
-      "Browse open roles and apply through the careers flow",
-      "Track a career application after submitting it",
-      "Subscribe to the newsletter and manage admin/newsletter workflows",
+      "Browse open roles, apply with a resume, and track application status",
+      "Practice with the AI mock interview flow before applying",
       "Use the built-in support chat for app help",
     ],
   },

@@ -2,6 +2,8 @@
 
 Genesis AI is an AI-powered full-stack platform that helps users generate, edit, preview, and deploy software projects from a single workspace. It provides an interactive React frontend and a Node.js/Express backend with PostgreSQL, secure authentication, and integrations for modern AI providers.
 
+The platform also includes a careers workflow with live job listings, resume-based applications, application status tracking, and an AI mock interview flow for candidates.
+
 The project is designed to streamline the path from idea to working application by combining intelligent code generation, project management, and deployment workflows in one developer-focused product.
 
 ## Developer Info :- 
