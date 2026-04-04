@@ -42,7 +42,7 @@ export default function Navbar() {
   const dropdownContainerRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const publicLinks = [
     { name: "Home", href: "/" },
@@ -328,6 +328,20 @@ export default function Navbar() {
               Credits: {Number(user?.credits || 0)}
             </button>
           </div>
+        )}
+
+        {user && (
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              setIsOpen(false);
+              navigate("/");
+            }}
+            className="rounded-full border border-red-500/30 bg-red-500/10 px-6 py-2.5 text-sm font-medium text-red-200 transition hover:bg-red-500/20 hover:text-red-100"
+          >
+            Logout
+          </button>
         )}
 
         {mobileLinks.map((link) => (

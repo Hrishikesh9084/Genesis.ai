@@ -15,6 +15,7 @@ import {
   Volume2,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
 function getSpeechRecognition() {
@@ -24,6 +25,7 @@ function getSpeechRecognition() {
 
 export default function MockInterview() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [role, setRole] = useState("");
   const [resumeFile, setResumeFile] = useState(null);
   const [isInferringRole, setIsInferringRole] = useState(false);
@@ -48,6 +50,7 @@ export default function MockInterview() {
   const answerRef = useRef("");
   const autoSubmitTimerRef = useRef(null);
   const manualStopRef = useRef(false);
+  const isAuthenticated = Boolean(user);
 
   useEffect(() => {
     answerRef.current = answer;
@@ -179,8 +182,8 @@ export default function MockInterview() {
   }, [isListening]);
 
   const canStart = useMemo(() => {
-    return resumeFile && !isStarting && !isInferringRole;
-  }, [resumeFile, isStarting, isInferringRole]);
+    return resumeFile && !isStarting && !isInferringRole && isAuthenticated && !authLoading;
+  }, [resumeFile, isStarting, isInferringRole, isAuthenticated, authLoading]);
 
   const canRunVideoCall = typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
 
@@ -403,6 +406,13 @@ export default function MockInterview() {
 
   const handleStartInterview = async (event) => {
     event.preventDefault();
+
+    if (!isAuthenticated) {
+      toast.error("Please log in to start the mock interview.");
+      navigate("/login", { replace: true, state: { from: "/careers/mock-interview" } });
+      return;
+    }
+
     if (!resumeFile) {
       toast.error("Upload your resume first.");
       return;
@@ -543,6 +553,12 @@ export default function MockInterview() {
           Upload your resume and join a live AI interview call with webcam + voice. The AI asks questions in real time and scores each response instantly.
         </p>
 
+        {!authLoading && !isAuthenticated && (
+          <div className="mt-5 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+            Sign in to start the mock interview. You can still review the flow, but interview sessions require an authenticated account.
+          </div>
+        )}
+
         <form className="mt-6 grid gap-4 md:grid-cols-[2fr_1fr_auto]" onSubmit={handleStartInterview}>
           <label className="block">
             <span className="mb-1.5 block text-sm text-slate-300">Resume file (PDF, DOC, DOCX)</span>
@@ -569,7 +585,7 @@ export default function MockInterview() {
           <div className="flex items-end">
             <button className="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-xl" type="submit" disabled={!canStart}>
               <Upload className="h-4 w-4" />
-              {isInferringRole ? "Analyzing Resume..." : isStarting ? "Starting..." : "Start Interview"}
+              {!isAuthenticated ? "Log in to Start" : isInferringRole ? "Analyzing Resume..." : isStarting ? "Starting..." : "Start Interview"}
             </button>
           </div>
         </form>
@@ -635,7 +651,7 @@ export default function MockInterview() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-gradient-to-br from-cyan-900/40 to-slate-900/60 p-3">
+              <div className="rounded-xl border border-white/10 bg-linear-to-br from-cyan-900/40 to-slate-900/60 p-3">
                 <p className="mb-2 text-xs uppercase tracking-wide text-slate-300">AI interviewer</p>
                 <div className="relative flex aspect-video items-center justify-center overflow-hidden rounded-lg border border-cyan-500/20 bg-black/50">
                   <div className={`absolute h-36 w-36 rounded-full bg-cyan-400/20 blur-2xl ${aiSpeaking ? "animate-pulse" : ""}`} />

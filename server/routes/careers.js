@@ -38,6 +38,7 @@ router.post('/apply', applyLimiter, upload.uploadResumeFile, validators.validate
 router.post('/status', statusLookupLimiter, validators.validateApplicationStatusLookup, careersController.getApplicationStatus);
 router.post(
 	'/mock-interview/suggest-role',
+	authenticate,
 	mockInterviewLimiter,
 	upload.uploadResumeFile,
 	validators.validateSuggestMockInterviewRole,
@@ -45,6 +46,7 @@ router.post(
 );
 router.post(
 	'/mock-interview/start',
+	authenticate,
 	mockInterviewLimiter,
 	upload.uploadResumeFile,
 	validators.validateStartMockInterview,
@@ -52,6 +54,7 @@ router.post(
 );
 router.post(
 	'/mock-interview/answer',
+	authenticate,
 	mockInterviewLimiter,
 	validators.validateMockInterviewAnswer,
 	mockInterviewController.answerMockInterviewQuestion
