@@ -37,7 +37,7 @@ const highlights = [
   {
     title: "Keep accounts secure",
     description:
-      "Authentication, profile settings, OAuth callbacks, and guarded routes are built into the app shell.",
+      "Authentication, profile settings, OAuth callbacks, and account security controls are built into the app shell.",
     icon: ShieldCheck,
   },
 ];
@@ -71,9 +71,9 @@ const workflowSteps = [
 
 const operationalNotes = [
   {
-    title: "Production routing",
+    title: "Environment configuration integrity",
     body:
-      "The server serves the client build in production and returns JSON on /api routes, so the docs page can be opened directly from the deployed app.",
+      "Production URLs, API keys, and provider credentials should match the active environment to keep authentication, billing, deployment, and email workflows stable.",
   },
   {
     title: "OAuth redirect safety",
@@ -96,6 +96,8 @@ const featureGroups = [
       "Describe the app you want with pages, features, and functionality",
       "Choose supported AI model options while creating a project",
       "Reuse generated output as a starting point for new iterations",
+      "Regenerate with refined prompts to improve architecture and feature completeness",
+      "Produce both client and server outputs for end-to-end delivery",
     ],
   },
   {
@@ -106,6 +108,8 @@ const featureGroups = [
       "Inspect project details and generated files in one place",
       "Review changes before sending a project forward",
       "Work from a focused project dashboard instead of juggling tools",
+      "Maintain feature consistency while iterating across client and server code",
+      "Apply AI-assisted edits while preserving existing project structure",
     ],
   },
   {
@@ -116,6 +120,8 @@ const featureGroups = [
       "Deploy projects when they are ready to ship",
       "Track deployment state during the release flow",
       "Use deployment logs and status feedback to debug failed releases",
+      "Monitor deployment outcomes and quickly iterate when builds fail",
+      "Validate production-readiness before sharing release links",
     ],
   },
   {
@@ -126,6 +132,8 @@ const featureGroups = [
       "Continue with GitHub or Google sign-in",
       "Buy credits to power generation and editing workflows",
       "Manage profile details, avatars, GitHub token, and deployment keys from settings",
+      "Use account-level controls to keep integration access secure",
+      "Track credit usage while running generation and editing workflows",
     ],
   },
   {
@@ -136,6 +144,8 @@ const featureGroups = [
       "Connect projects to supported deployment providers",
       "Keep project delivery aligned with production release workflows",
       "Use account-level settings to prepare deployment credentials",
+      "Publish iterated project versions as your feature set evolves",
+      "Coordinate source control and deployment handoff from one workspace",
     ],
   },
   {
@@ -146,6 +156,8 @@ const featureGroups = [
       "Browse open roles, apply with a resume, and track application status",
       "Practice with the AI mock interview flow before applying",
       "Use the built-in support chat for app help",
+      "Get operational guidance when generation, preview, or deploy flows fail",
+      "Use documentation-backed support steps for faster issue resolution",
     ],
   },
 ];
@@ -176,7 +188,7 @@ export default function Documentation() {
               Genesis.ai documentation for the full application stack.
             </h1>
             <p className="mt-5 max-w-3xl text-base leading-8 text-slate-300">
-              This page summarizes the product features, the user journey, and the operational behavior of Genesis.ai.
+              This page provides detailed, feature-focused documentation for product capabilities, workflow behavior, and platform operations across Genesis.ai.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
@@ -240,7 +252,7 @@ export default function Documentation() {
             <SectionHeading
               eyebrow="Complete features"
               title="Everything the platform currently offers"
-              description="These are the core product capabilities available across the Genesis.ai experience."
+              description="These are the detailed product capabilities available across the Genesis.ai experience, organized by real usage areas."
             />
 
             <div className="mt-8 grid gap-4 lg:grid-cols-2">
