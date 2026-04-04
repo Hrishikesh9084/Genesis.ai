@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Building2, MapPin, Rocket } from "lucide-react";
+import { BriefcaseBusiness, Building2, FireExtinguisher, Flame, MapPin, Rocket } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
@@ -105,8 +105,10 @@ export default function Careers() {
         </div>
 
         <div className="mt-6 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 sm:p-5">
-          <p className="text-sm text-cyan-100">
+          <p className="flex gap-2 text-sm text-cyan-100">
             Want to practice before applying? Try the AI real-time voice mock interview using your resume.
+          {/* <Flame/> */}
+            <img className="md:w-5 md:h-5 w-8 h-8" src="../assets/flame.gif" alt="" />
           </p>
           <Link
             to="/careers/mock-interview"
