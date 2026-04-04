@@ -287,7 +287,7 @@ export default function Navbar() {
               </button>
               <UserAvatar user={user} />
               <span className="p-2  text-sm text-gray-300 max-w-24 truncate">
-                {user.name}
+                
               </span>
             </button>
           ) : (
