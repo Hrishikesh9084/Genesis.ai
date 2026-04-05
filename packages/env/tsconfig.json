@@ -1,0 +1,3 @@
+{
+  "extends": "@Genesis.ai/config/tsconfig.base.json"
+}

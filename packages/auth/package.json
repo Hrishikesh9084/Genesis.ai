@@ -1,0 +1,27 @@
+{
+  "name": "@Genesis.ai/auth",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@Genesis.ai/db": "*",
+    "@Genesis.ai/env": "*",
+    "@better-auth/prisma-adapter": "^1.5.5",
+    "better-auth": "^1.5.5",
+    "dotenv": "^17.2.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@Genesis.ai/config": "*",
+    "typescript": "^5"
+  }
+}
