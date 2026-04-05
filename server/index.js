@@ -108,10 +108,10 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default app;
-<<<<<<< HEAD
-=======
+// <<<<<<< HEAD
+// =======
 
 
 
 // Hello Developer
->>>>>>> 179a82a (Hello)
+// >>>>>>> 179a82a (Hello)
