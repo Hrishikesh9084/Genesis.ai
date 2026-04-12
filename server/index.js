@@ -54,7 +54,7 @@ const configuredOrigins = getClientOriginCandidates(process.env.CLIENT_URL)
 
 const allowedOrigins = configuredOrigins.length > 0
   ? configuredOrigins
-  : ['http://localhost:5173'];
+  : ['http://localhost:5173', 'https://genesis-ai-azure.vercel.app'];
 
 // Required when running behind a reverse proxy (Vercel/Render/Nginx) so req.ip is derived correctly.
 app.set('trust proxy', 1);
