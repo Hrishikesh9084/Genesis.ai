@@ -6,6 +6,10 @@
 	"outputDirectory": "dist",
 	"rewrites": [
 		{
+			"source": "/api/(.*)",
+			"destination": "https://genesis-ai-tu97.vercel.app/api/$1"
+		},
+		{
 			"source": "/(.*)",
 			"destination": "/index.html"
 		}
