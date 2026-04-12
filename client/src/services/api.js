@@ -6,7 +6,7 @@ const isLocalhost =
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 export const API_BASE_URL =
-  (rawApiBaseUrl || (isLocalhost ? 'http://localhost:5000/api' : `${typeof window !== 'undefined' ? window.location.origin : ''}/api`)).replace(/\/+$/, '');
+  (rawApiBaseUrl || (isLocalhost ? 'http://localhost:5000/api' || 'https://genesis-ai-tu97.vercel.app/api' : `${typeof window !== 'undefined' ? window.location.origin : ''}/api`)).replace(/\/+$/, '');
 
 export const GITHUB_OAUTH_URL = `${API_BASE_URL}/auth/github`;
 export const GOOGLE_OAUTH_URL = `${API_BASE_URL}/auth/google`;

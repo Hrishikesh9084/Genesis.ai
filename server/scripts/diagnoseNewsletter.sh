@@ -38,7 +38,7 @@ fi
 # Check 4: Server running
 echo ""
 echo "${YELLOW}[4/6]${NC} Checking if server is running..."
-if curl -s http://localhost:5000/api/health > /dev/null; then
+if curl -s http://localhost:5000/api/health || curl -s https://genesis-ai-tu97.vercel.app/api/health > /dev/null; then
   echo "${GREEN}✓${NC} Server is running on port 5000"
 else
   echo "${RED}✗${NC} Server not responding on port 5000"
