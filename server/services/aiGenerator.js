@@ -422,7 +422,7 @@ const PORT = process.env.PORT || 5000;
 
 // Security & performance middleware
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' || 'https://genesis-ai-azure.vercel.app', credentials: true }));
 app.use(compression());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '2mb' }));
@@ -687,7 +687,7 @@ export default api;
 NODE_ENV=development
 JWT_SECRET=your_jwt_secret_here
 DATABASE_URL=./database.db
-CLIENT_URL=http://localhost:5173
+CLIENT_URL=http://localhost:5173 || 'https://genesis-ai-azure.vercel.app'
 `;
   }
 
