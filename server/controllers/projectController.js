@@ -70,7 +70,7 @@ const createProject = async (req, res, next) => {
 
     const result = await db.query(
       'INSERT INTO projects (user_id, name, prompt, stack, model, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [req.user.id, name, prompt, stack || 'nextjs-express', selectedModel, 'generating']
+      [req.user.id, name, prompt, stack || 'fullstack', selectedModel, 'generating']
     );
 
     const project = result.rows[0];
@@ -83,7 +83,7 @@ const createProject = async (req, res, next) => {
 
     project.files = previewFiles;
 
-    generateProjectAsync(project.id, prompt, stack || 'nextjs-express', selectedModel);
+    generateProjectAsync(project.id, prompt, stack || 'fullstack', selectedModel);
 
     res.status(201).json({ project, creditsRemaining: Number(creditResult.credits || 0) });
   } catch (err) {

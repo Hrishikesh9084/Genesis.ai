@@ -16,6 +16,7 @@ const Register = lazy(() => import("./pages/Register"));
 const PricingPlans = lazy(() => import("./pages/pricing-plans"));
 const Documentation = lazy(() => import("./pages/Documentation"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Domains = lazy(() => import("./pages/Domains"));
 const NewProject = lazy(() => import("./pages/NewProject"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const EditProject = lazy(() => import("./pages/EditProject"));
@@ -137,6 +138,7 @@ export default function App() {
 
             {/* Protected routes */}
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/domains" element={<ProtectedRoute><Domains /></ProtectedRoute>} />
             <Route path="/new-project" element={<ProtectedRoute><NewProject /></ProtectedRoute>} />
             <Route path="/project/:id" element={<ProtectedRoute><ProjectDetail /></ProtectedRoute>} />
             <Route path="/project/:id/edit" element={<ProtectedRoute><EditProject /></ProtectedRoute>} />

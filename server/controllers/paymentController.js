@@ -154,41 +154,41 @@ const verifyPayment = async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid payment signature.' });
     }
 
-    const client = await db.pool.connect();
-    try {
-      await client.query('BEGIN');
-
-      await client.query(
-        `UPDATE credit_transactions
+    const verifyResult = await db.query(
+      `WITH updated_tx AS (
+         UPDATE credit_transactions
          SET razorpay_payment_id = $1,
              razorpay_signature = $2,
              status = 'paid',
              updated_at = NOW()
-         WHERE id = $3`,
-        [paymentId, signature, tx.id]
-      );
-
-      const userUpdate = await client.query(
-        `UPDATE users
-         SET credits = credits + $1,
+         WHERE id = $3
+           AND status <> 'paid'
+         RETURNING id
+       ),
+       updated_user AS (
+         UPDATE users
+         SET credits = credits + $4,
              updated_at = NOW()
-         WHERE id = $2
-         RETURNING credits`,
-        [Number(tx.credits || 0), req.user.id]
-      );
+         WHERE id = $5
+           AND EXISTS (SELECT 1 FROM updated_tx)
+         RETURNING credits
+       )
+       SELECT
+         (SELECT COUNT(*)::INT FROM updated_tx) AS tx_updated,
+         (SELECT credits FROM updated_user LIMIT 1) AS credits`,
+      [paymentId, signature, tx.id, Number(tx.credits || 0), req.user.id]
+    );
 
-      await client.query('COMMIT');
-
-      return res.json({
-        message: 'Payment verified. Credits added successfully.',
-        credits: Number(userUpdate.rows[0]?.credits || 0),
-      });
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
+    const txUpdated = Number(verifyResult.rows[0]?.tx_updated || 0);
+    if (txUpdated === 0) {
+      const userResult = await db.query('SELECT credits FROM users WHERE id = $1', [req.user.id]);
+      return res.json({ message: 'Payment already verified.', credits: Number(userResult.rows[0]?.credits || 0) });
     }
+
+    return res.json({
+      message: 'Payment verified. Credits added successfully.',
+      credits: Number(verifyResult.rows[0]?.credits || 0),
+    });
   } catch (err) {
     return next(err);
   }

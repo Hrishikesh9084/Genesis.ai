@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
+    "start:pm2": "pm2 start ecosystem.config.cjs",
+    "restart:pm2": "pm2 restart genesis-server",
+    "stop:pm2": "pm2 stop genesis-server",
     "db:init": "node config/initDb.js",
     "build": "echo 'No build step required for server'"
   },
@@ -15,9 +18,10 @@
     "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.0",
+    "express": "^4.22.1",
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
+    "http-proxy": "^1.18.1",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.10.0",
     "multer": "^1.4.5-lts.1",
@@ -26,6 +30,7 @@
     "openai": "^6.33.0",
     "pdf-parse": "^1.1.1",
     "pg": "^8.13.0",
+    "pm2": "^5.4.3",
     "razorpay": "^2.9.6",
     "uuid": "^10.0.0"
   },

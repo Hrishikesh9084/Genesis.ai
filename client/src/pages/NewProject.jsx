@@ -7,12 +7,12 @@ import { validateProjectInput } from "../utils/validators";
 import { useAuth } from "../context/AuthContext";
 
 const promptExamples = [
-  "Build a todo app with user authentication, categories, due dates, and priority levels",
-  "Create an e-commerce store with product listings, shopping cart, and checkout flow",
-  "Build a blog platform with markdown editor, categories, comments, and user profiles",
-  "Create a real-time chat application with rooms, direct messages, and online status",
-  "Build a project management tool like Trello with boards, lists, and drag-and-drop cards",
-  "Create a recipe sharing platform with search, ratings, and user collections",
+  "Build a task management app with user auth (register/login), task CRUD with categories, due dates, priority levels, pagination, and a dashboard showing stats. Persist all data in a database.",
+  "Create an e-commerce store with product catalog (search, filter, pagination), shopping cart, user accounts, order history, and admin panel for product management. Use a real database for products and orders.",
+  "Build a blog platform with user auth, markdown editor, post categories and tags, comments with replies, user profiles, and search. Include pagination and database persistence for all content.",
+  "Create a project management tool with boards, task lists, drag-and-drop cards, team member assignment, status tracking, and activity logs. Include JWT auth and database storage.",
+  "Build a recipe sharing platform with user profiles, recipe CRUD with ingredients and steps, search and filter by category, star ratings, collections/favorites, and pagination. Store all data in a database.",
+  "Create an inventory management system with product tracking, categories, stock levels, supplier management, low-stock alerts, and reports dashboard. Include role-based auth and database persistence.",
 ];
 
 const LOCKED_MODEL_ID = "gemini-2.5-pro";

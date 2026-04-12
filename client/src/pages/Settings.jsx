@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Github, Key, Save, Loader2, User, Upload, AlertTriangle, Trash2, LogOut, DeleteIcon, Eye, EyeOff } from 'lucide-react';
+import { Github, Key, Save, Loader2, User, Upload, Trash2, LogOut, DeleteIcon, Rocket } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -9,19 +9,21 @@ export default function Settings() {
   const { user, updateProfile, uploadProfileImage, deleteAccount, logout } = useAuth();
   const navigate = useNavigate();
   const [githubToken, setGithubToken] = useState('');
-  const [saving, setSaving] = useState(false);
   const [vercelToken, setVercelToken] = useState('');
   const [renderApiKey, setRenderApiKey] = useState('');
   const [renderOwnerId, setRenderOwnerId] = useState('');
-  const [hasVercelToken, setHasVercelToken] = useState(false);
-  const [hasRenderApiKey, setHasRenderApiKey] = useState(false);
-  const [savingDeployKeys, setSavingDeployKeys] = useState(false);
-  const [loadingDeployKeys, setLoadingDeployKeys] = useState(true);
-  const [savedRenderOwnerId, setSavedRenderOwnerId] = useState('');
-  const [showVercelToken, setShowVercelToken] = useState(false);
-  const [showRenderApiKey, setShowRenderApiKey] = useState(false);
-  const [removingVercelToken, setRemovingVercelToken] = useState(false);
-  const [removingRenderApiKey, setRemovingRenderApiKey] = useState(false);
+  const [dockerCloudVpsHost, setDockerCloudVpsHost] = useState('');
+  const [dockerCloudVpsUser, setDockerCloudVpsUser] = useState('root');
+  const [dockerCloudVpsPort, setDockerCloudVpsPort] = useState('22');
+  const [dockerCloudVpsSshPrivateKey, setDockerCloudVpsSshPrivateKey] = useState('');
+  const [dockerCloudDomain, setDockerCloudDomain] = useState('');
+  const [dockerCloudApiDomain, setDockerCloudApiDomain] = useState('');
+  const [dockerCloudSslEmail, setDockerCloudSslEmail] = useState('');
+  const [dockerCloudProvider, setDockerCloudProvider] = useState('vps');
+  const [dockerCloudEnableKubernetes, setDockerCloudEnableKubernetes] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savingDeploymentKeys, setSavingDeploymentKeys] = useState(false);
+  const [loadingDeploymentKeys, setLoadingDeploymentKeys] = useState(true);
   const [profileName, setProfileName] = useState('');
   const [profileImage, setProfileImage] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -36,18 +38,23 @@ export default function Settings() {
 
   useEffect(() => {
     const fetchDeploymentKeys = async () => {
+      setLoadingDeploymentKeys(true);
       try {
         const res = await api.get('/auth/deployment-keys');
         const keys = res.data?.keys || {};
-        setHasVercelToken(Boolean(keys.has_vercel_token));
-        setHasRenderApiKey(Boolean(keys.has_render_api_key));
-        const ownerId = keys.render_owner_id || '';
-        setRenderOwnerId(ownerId);
-        setSavedRenderOwnerId(ownerId);
+        setRenderOwnerId(keys.render_owner_id || '');
+        setDockerCloudVpsHost(keys.docker_cloud_vps_host || '');
+        setDockerCloudVpsUser(keys.docker_cloud_vps_user || 'root');
+        setDockerCloudVpsPort(String(keys.docker_cloud_vps_port || 22));
+        setDockerCloudDomain(keys.docker_cloud_domain || '');
+        setDockerCloudApiDomain(keys.docker_cloud_api_domain || '');
+        setDockerCloudSslEmail(keys.docker_cloud_ssl_email || '');
+        setDockerCloudProvider(keys.docker_cloud_provider || 'vps');
+        setDockerCloudEnableKubernetes(Boolean(keys.docker_cloud_enable_kubernetes));
       } catch {
-        toast.error('Failed to load deployment key status');
+        toast.error('Failed to load deployment settings');
       } finally {
-        setLoadingDeployKeys(false);
+        setLoadingDeploymentKeys(false);
       }
     };
 
@@ -102,7 +109,6 @@ export default function Settings() {
     try {
       const updatedUser = await uploadProfileImage(file);
       setProfileImage(updatedUser.avatar_url || '');
-      toast.success('Profile image uploaded');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to upload image');
     } finally {
@@ -130,68 +136,30 @@ export default function Settings() {
   };
 
   const handleSaveDeploymentKeys = async () => {
-    const payload = {};
-    const nextVercelToken = vercelToken.trim();
-    const nextRenderApiKey = renderApiKey.trim();
-    const nextOwnerId = renderOwnerId.trim();
-
-    if (nextVercelToken) {
-      payload.vercel_token = nextVercelToken;
-    }
-
-    if (nextRenderApiKey) {
-      payload.render_api_key = nextRenderApiKey;
-    }
-
-    if (nextOwnerId !== savedRenderOwnerId) {
-      payload.render_owner_id = nextOwnerId;
-    }
-
-    if (Object.keys(payload).length === 0) {
-      toast.error('Enter a deployment key or change Render owner ID first');
-      return;
-    }
-
-    setSavingDeployKeys(true);
+    setSavingDeploymentKeys(true);
     try {
-      const res = await api.put('/auth/deployment-keys', payload);
-      const keys = res.data?.keys || {};
-      setHasVercelToken(Boolean(keys.has_vercel_token));
-      setHasRenderApiKey(Boolean(keys.has_render_api_key));
-      const ownerId = keys.render_owner_id || '';
-      setRenderOwnerId(ownerId);
-      setSavedRenderOwnerId(ownerId);
+      await api.put('/auth/deployment-keys', {
+        vercel_token: vercelToken,
+        render_api_key: renderApiKey,
+        render_owner_id: renderOwnerId,
+        docker_cloud_vps_host: dockerCloudVpsHost,
+        docker_cloud_vps_user: dockerCloudVpsUser,
+        docker_cloud_vps_port: dockerCloudVpsPort,
+        docker_cloud_vps_ssh_private_key: dockerCloudVpsSshPrivateKey,
+        docker_cloud_domain: dockerCloudDomain,
+        docker_cloud_api_domain: dockerCloudApiDomain,
+        docker_cloud_ssl_email: dockerCloudSslEmail,
+        docker_cloud_provider: dockerCloudProvider,
+        docker_cloud_enable_kubernetes: dockerCloudEnableKubernetes,
+      });
+      toast.success('Deployment settings saved!');
       setVercelToken('');
       setRenderApiKey('');
-      toast.success('Deployment keys updated');
+      setDockerCloudVpsSshPrivateKey('');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to save deployment keys');
+      toast.error(err.response?.data?.error || 'Failed to save deployment settings');
     } finally {
-      setSavingDeployKeys(false);
-    }
-  };
-
-  const handleRemoveDeploymentKey = async (keyType) => {
-    const payload = keyType === 'vercel'
-      ? { vercel_token: '' }
-      : { render_api_key: '' };
-
-    if (keyType === 'vercel') setRemovingVercelToken(true);
-    if (keyType === 'render') setRemovingRenderApiKey(true);
-
-    try {
-      const res = await api.put('/auth/deployment-keys', payload);
-      const keys = res.data?.keys || {};
-      setHasVercelToken(Boolean(keys.has_vercel_token));
-      setHasRenderApiKey(Boolean(keys.has_render_api_key));
-      setVercelToken('');
-      setRenderApiKey('');
-      toast.success(`${keyType === 'vercel' ? 'Vercel token' : 'Render API key'} removed`);
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to remove key');
-    } finally {
-      if (keyType === 'vercel') setRemovingVercelToken(false);
-      if (keyType === 'render') setRemovingRenderApiKey(false);
+      setSavingDeploymentKeys(false);
     }
   };
 
@@ -276,19 +244,7 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-sm text-gray-400 mb-1">Email</label>
-            <p className="text-white">{user?.email}</p>
-          </div>
-          <div>
-            <label htmlFor="profile-image-url" className="block text-sm text-gray-400 mb-1">Profile image URL</label>
-            <input
-              id="profile-image-url"
-              type="url"
-              value={profileImage}
-              onChange={(e) => setProfileImage(e.target.value)}
-              className="input-field"
-              placeholder="https://example.com/avatar.jpg"
-            />
-            <p className="text-xs text-gray-500 mt-1">Leave empty to remove profile image.</p>
+            <p className="text-white/50 border border-gray-800 p-2 rounded-xl bg-gray-900"><span className='ml-1 cursor-not-allowed select-none'>{user?.email}</span></p>
           </div>
           <button
             onClick={handleSaveProfile}
@@ -345,142 +301,43 @@ export default function Settings() {
       </div>
 
       {/* Deployment Keys */}
-      <div className="card">
+      <div className="card mb-6">
         <div className="flex items-center space-x-3 mb-4">
-          <Key className="w-5 h-5 text-orange-400" />
-          <h2 className="text-lg font-semibold">Deployment Keys</h2>
+          <Rocket className="w-5 h-5 text-orange-400" />
+          <h2 className="text-lg font-semibold">Deployment Providers</h2>
         </div>
         <p className="text-sm text-gray-400 mb-4">
-          Add your Vercel and Render API keys to deploy frontend and backend separately from the Deploy page.
+          Save your own Vercel, Render, and Docker Cloud credentials to deploy projects directly to your infrastructure.
+          Leave a field blank to keep the existing stored value.
         </p>
 
-        <div className="mb-4 rounded-lg border border-gray-800 bg-gray-900/60 p-3 text-xs text-gray-300">
-          <p className="font-medium text-gray-100 mb-2">Generate Deployment Keys</p>
-          <div className="space-y-2">
-            <p>
-              1. Vercel token: go to{' '}
-              <a
-                href="https://vercel.com/account/tokens"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-orange-400 hover:underline"
-              >
-                Vercel Dashboard - Account Tokens
-              </a>{' '}
-              and create a new token.
-            </p>
-            <p>
-              2. Render API key: go to{' '}
-              <a
-                href="https://dashboard.render.com/account/api-keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-orange-400 hover:underline"
-              >
-                Render Dashboard - API Keys
-              </a>{' '}
-              and create a key.
-            </p>
-            <p>
-              3. Optional owner ID (Render): open{' '}
-              <a
-                href="https://dashboard.render.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-orange-400 hover:underline"
-              >
-                Render Dashboard
-              </a>{' '}
-              and copy workspace owner ID if you want to set it manually.
-            </p>
+        {loadingDeploymentKeys ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Loading deployment settings...</span>
           </div>
-        </div>
-
-        {loadingDeployKeys ? (
-          <p className="text-sm text-gray-500">Loading key status...</p>
         ) : (
           <div className="space-y-3">
-            <div className="grid sm:grid-cols-2 gap-3 text-sm">
-              <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                <span className="text-gray-300">Vercel Token</span>
-                <span className={`text-xs px-2 py-1 rounded ${hasVercelToken ? 'bg-green-900/40 text-green-300' : 'bg-gray-700 text-gray-400'}`}>
-                  {hasVercelToken ? 'Configured' : 'Missing'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                <span className="text-gray-300">Render API Key</span>
-                <span className={`text-xs px-2 py-1 rounded ${hasRenderApiKey ? 'bg-green-900/40 text-green-300' : 'bg-gray-700 text-gray-400'}`}>
-                  {hasRenderApiKey ? 'Configured' : 'Missing'}
-                </span>
-              </div>
-            </div>
-
             <div>
               <label className="block text-sm text-gray-400 mb-1">Vercel Token</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type={showVercelToken ? 'text' : 'password'}
-                    value={vercelToken}
-                    onChange={(e) => setVercelToken(e.target.value)}
-                    placeholder={hasVercelToken ? 'Token saved (masked). Enter new value to replace.' : 'Enter Vercel token'}
-                    className="input-field pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowVercelToken((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                    aria-label={showVercelToken ? 'Hide Vercel token input' : 'Show Vercel token input'}
-                  >
-                    {showVercelToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDeploymentKey('vercel')}
-                  disabled={!hasVercelToken || removingVercelToken}
-                  className="px-3 py-2 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {removingVercelToken ? 'Removing...' : 'Remove'}
-                </button>
-              </div>
-              {hasVercelToken && (
-                <p className="text-xs text-gray-500 mt-1">Saved token: ************</p>
-              )}
+              <input
+                type="password"
+                value={vercelToken}
+                onChange={(e) => setVercelToken(e.target.value)}
+                placeholder="Paste your Vercel token"
+                className="input-field"
+              />
             </div>
 
             <div>
               <label className="block text-sm text-gray-400 mb-1">Render API Key</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type={showRenderApiKey ? 'text' : 'password'}
-                    value={renderApiKey}
-                    onChange={(e) => setRenderApiKey(e.target.value)}
-                    placeholder={hasRenderApiKey ? 'Key saved (masked). Enter new value to replace.' : 'Enter Render API key'}
-                    className="input-field pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowRenderApiKey((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-                    aria-label={showRenderApiKey ? 'Hide Render API key input' : 'Show Render API key input'}
-                  >
-                    {showRenderApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveDeploymentKey('render')}
-                  disabled={!hasRenderApiKey || removingRenderApiKey}
-                  className="px-3 py-2 rounded-lg border border-red-500/40 text-red-300 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {removingRenderApiKey ? 'Removing...' : 'Remove'}
-                </button>
-              </div>
-              {hasRenderApiKey && (
-                <p className="text-xs text-gray-500 mt-1">Saved key: ************</p>
-              )}
+              <input
+                type="password"
+                value={renderApiKey}
+                onChange={(e) => setRenderApiKey(e.target.value)}
+                placeholder="Paste your Render API key"
+                className="input-field"
+              />
             </div>
 
             <div>
@@ -489,26 +346,132 @@ export default function Settings() {
                 type="text"
                 value={renderOwnerId}
                 onChange={(e) => setRenderOwnerId(e.target.value)}
-                placeholder="If empty, app tries auto-detection"
+                placeholder="srv-... or usr-..."
+                className="input-field"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                If left empty, we auto-detect the first accessible Render workspace.
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-gray-800">
+              <h3 className="text-sm font-semibold text-white mb-2">Docker Cloud (Free VPS + Nginx + SSL + Optional Kubernetes)</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                This mode provisions Docker Compose with nginx reverse proxy, SSL automation, and optional k3s autoscaling via SSH on your VPS.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Cloud Provider</label>
+              <select
+                value={dockerCloudProvider}
+                onChange={(e) => setDockerCloudProvider(e.target.value)}
+                className="input-field"
+              >
+                <option value="vps">Generic VPS</option>
+                <option value="aws">AWS (Free Tier EC2)</option>
+                <option value="digitalocean">DigitalOcean (Credits / Low-cost droplet)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">VPS Host / IP</label>
+              <input
+                type="text"
+                value={dockerCloudVpsHost}
+                onChange={(e) => setDockerCloudVpsHost(e.target.value)}
+                placeholder="203.0.113.10"
                 className="input-field"
               />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">VPS SSH User</label>
+                <input
+                  type="text"
+                  value={dockerCloudVpsUser}
+                  onChange={(e) => setDockerCloudVpsUser(e.target.value)}
+                  placeholder="root"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">VPS SSH Port</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="65535"
+                  value={dockerCloudVpsPort}
+                  onChange={(e) => setDockerCloudVpsPort(e.target.value)}
+                  placeholder="22"
+                  className="input-field"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">VPS SSH Private Key</label>
+              <textarea
+                value={dockerCloudVpsSshPrivateKey}
+                onChange={(e) => setDockerCloudVpsSshPrivateKey(e.target.value)}
+                rows={4}
+                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+                className="input-field"
+              />
+              <p className="text-xs text-gray-500 mt-1">Leave empty to keep the existing stored private key.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Primary App Domain</label>
+              <input
+                type="text"
+                value={dockerCloudDomain}
+                onChange={(e) => setDockerCloudDomain(e.target.value)}
+                placeholder="app.example.com"
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">API Domain</label>
+              <input
+                type="text"
+                value={dockerCloudApiDomain}
+                onChange={(e) => setDockerCloudApiDomain(e.target.value)}
+                placeholder="api.example.com"
+                className="input-field"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">SSL Email (Let's Encrypt)</label>
+              <input
+                type="email"
+                value={dockerCloudSslEmail}
+                onChange={(e) => setDockerCloudSslEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="input-field"
+              />
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                checked={dockerCloudEnableKubernetes}
+                onChange={(e) => setDockerCloudEnableKubernetes(e.target.checked)}
+              />
+              <span>Enable Kubernetes (k3s) + Horizontal Pod Autoscaling bootstrap</span>
+            </label>
+
             <button
               onClick={handleSaveDeploymentKeys}
-              disabled={savingDeployKeys}
-              className="btn-primary inline-flex items-center gap-2"
+              disabled={savingDeploymentKeys}
+              className="btn-primary inline-flex items-center space-x-2"
             >
-              {savingDeployKeys ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              <span>{savingDeployKeys ? 'Saving...' : 'Save Deployment Keys'}</span>
+              {savingDeploymentKeys ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span>{savingDeploymentKeys ? 'Saving...' : 'Save Deployment Settings'}</span>
             </button>
-
-            <p className="text-xs text-gray-500">
-              Keys are never shown after saving. Use Remove to revoke stored keys.
-            </p>
-            <p className="text-xs text-white/60">
-              <span className='text-white gap-2'>Note: </span>We do not store users’ personal API keys or private identifiers in our database. All sensitive credentials remain securely managed by the user and are never persisted on our servers. Our system is designed to prioritize privacy and security by ensuring that no confidential key information is retained, logged, or exposed at any stage.
-            </p>
           </div>
         )}
       </div>

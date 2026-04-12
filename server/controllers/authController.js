@@ -38,6 +38,33 @@ function ensureDeploymentKeyColumns() {
 
         ALTER TABLE IF EXISTS users
         ADD COLUMN IF NOT EXISTS render_owner_id TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_vps_host TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_vps_user TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_vps_port INTEGER;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_vps_ssh_private_key TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_domain TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_api_domain TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_ssl_email TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_provider TEXT;
+
+        ALTER TABLE IF EXISTS users
+        ADD COLUMN IF NOT EXISTS docker_cloud_enable_kubernetes BOOLEAN DEFAULT FALSE;
       `)
       .catch((err) => {
         ensureDeploymentKeyColumnsPromise = null;
@@ -118,7 +145,31 @@ function isLocalhostHost(value) {
 }
 
 function isProduction() {
-  return String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+  const nodeEnv = String(process.env.NODE_ENV || '').toLowerCase();
+  return (
+    nodeEnv === 'production' ||
+    String(process.env.RENDER || '').toLowerCase() === 'true' ||
+    String(process.env.VERCEL || '').toLowerCase() === '1'
+  );
+}
+
+function getEnvUrlCandidates(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+
+  return raw
+    .split(/\|\||,/)
+    .map((segment) => segment.trim())
+    .map((segment) => segment.replace(/^['\"]+|['\"]+$/g, '').trim())
+    .filter(Boolean);
+}
+
+function toNormalizedUrl(raw) {
+  try {
+    return new URL(String(raw).trim()).toString().replace(/\/$/, '');
+  } catch {
+    return null;
+  }
 }
 
 function shouldIgnoreLocalhostEnvUrl(req, urlValue) {
@@ -136,20 +187,30 @@ function shouldIgnoreLocalhostEnvUrl(req, urlValue) {
 }
 
 function sanitizeEnvUrl(req, urlValue, label) {
-  const raw = urlValue?.trim();
-  if (!raw) return null;
+  const candidates = getEnvUrlCandidates(urlValue);
+  if (!candidates.length) return null;
 
-  if (isProduction() && isLocalhostUrl(raw)) {
-    console.warn(`[Auth URL Resolver] Ignoring ${label} because it points to localhost in production: ${raw}`);
-    return null;
+  for (const candidate of candidates) {
+    const normalized = toNormalizedUrl(candidate);
+    if (!normalized) {
+      console.warn(`[Auth URL Resolver] Ignoring invalid ${label}: ${candidate}`);
+      continue;
+    }
+
+    if (isProduction() && isLocalhostUrl(normalized)) {
+      console.warn(`[Auth URL Resolver] Ignoring ${label} because it points to localhost in production: ${normalized}`);
+      continue;
+    }
+
+    if (shouldIgnoreLocalhostEnvUrl(req, normalized)) {
+      console.warn(`[Auth URL Resolver] Ignoring ${label} because request host is non-local while env URL is localhost: ${normalized}`);
+      continue;
+    }
+
+    return normalized;
   }
 
-  if (shouldIgnoreLocalhostEnvUrl(req, raw)) {
-    console.warn(`[Auth URL Resolver] Ignoring ${label} because request host is non-local while env URL is localhost: ${raw}`);
-    return null;
-  }
-
-  return raw.replace(/\/$/, '');
+  return null;
 }
 
 function resolveGithubRedirectUri(req) {
@@ -199,6 +260,12 @@ function resolveServerBaseUrl(req) {
   const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.get('host');
   return `${protocol}://${host}`;
+}
+
+function bufferToDataUrl(file) {
+  if (!file?.buffer || !file?.mimetype) return null;
+  const base64 = file.buffer.toString('base64');
+  return `data:${file.mimetype};base64,${base64}`;
 }
 
 function getAdminEmailSet() {
@@ -347,8 +414,8 @@ const updateProfile = async (req, res, next) => {
     const nextName = name !== undefined ? String(name).trim() : null;
     const nextAvatarRaw = avatar_url !== undefined ? String(avatar_url).trim() : null;
 
-    if (nextAvatarRaw && !/^https?:\/\//i.test(nextAvatarRaw)) {
-      return res.status(400).json({ error: 'avatar_url must start with http:// or https://.' });
+    if (nextAvatarRaw && !/^https?:\/\//i.test(nextAvatarRaw) && !/^data:image\//i.test(nextAvatarRaw)) {
+      return res.status(400).json({ error: 'avatar_url must start with http://, https://, or data:image/.' });
     }
 
     const result = await db.query(
@@ -384,7 +451,7 @@ const uploadProfileImage = async (req, res, next) => {
       return res.status(400).json({ error: 'Image file is required.' });
     }
 
-    const avatarUrl = `${resolveServerBaseUrl(req)}/uploads/avatars/${req.file.filename}`;
+    const avatarUrl = bufferToDataUrl(req.file) || `${resolveServerBaseUrl(req)}/uploads/avatars/${req.file.filename}`;
 
     const result = await db.query(
       `UPDATE users
@@ -425,7 +492,21 @@ const getDeploymentKeys = async (req, res, next) => {
     await ensureDeploymentKeyColumns();
 
     const result = await db.query(
-      'SELECT vercel_token, render_api_key, render_owner_id FROM users WHERE id = $1',
+      `SELECT
+         vercel_token,
+         render_api_key,
+         render_owner_id,
+         docker_cloud_vps_host,
+         docker_cloud_vps_user,
+         docker_cloud_vps_port,
+         docker_cloud_domain,
+         docker_cloud_api_domain,
+         docker_cloud_ssl_email,
+         docker_cloud_provider,
+         docker_cloud_enable_kubernetes,
+         docker_cloud_vps_ssh_private_key
+       FROM users
+       WHERE id = $1`,
       [req.user.id]
     );
 
@@ -436,9 +517,19 @@ const getDeploymentKeys = async (req, res, next) => {
     const row = result.rows[0];
     return res.json({
       keys: {
+        has_genesis_deploy: true,
         has_vercel_token: Boolean(row.vercel_token),
         has_render_api_key: Boolean(row.render_api_key),
         render_owner_id: row.render_owner_id || '',
+        docker_cloud_vps_host: row.docker_cloud_vps_host || '',
+        docker_cloud_vps_user: row.docker_cloud_vps_user || '',
+        docker_cloud_vps_port: row.docker_cloud_vps_port || 22,
+        docker_cloud_domain: row.docker_cloud_domain || '',
+        docker_cloud_api_domain: row.docker_cloud_api_domain || '',
+        docker_cloud_ssl_email: row.docker_cloud_ssl_email || '',
+        docker_cloud_provider: row.docker_cloud_provider || 'vps',
+        docker_cloud_enable_kubernetes: Boolean(row.docker_cloud_enable_kubernetes),
+        has_docker_cloud_vps_ssh_private_key: Boolean(row.docker_cloud_vps_ssh_private_key),
       },
     });
   } catch (err) {
@@ -450,7 +541,20 @@ const updateDeploymentKeys = async (req, res, next) => {
   try {
     await ensureDeploymentKeyColumns();
 
-    const { vercel_token, render_api_key, render_owner_id } = req.body || {};
+    const {
+      vercel_token,
+      render_api_key,
+      render_owner_id,
+      docker_cloud_vps_host,
+      docker_cloud_vps_user,
+      docker_cloud_vps_port,
+      docker_cloud_vps_ssh_private_key,
+      docker_cloud_domain,
+      docker_cloud_api_domain,
+      docker_cloud_ssl_email,
+      docker_cloud_provider,
+      docker_cloud_enable_kubernetes,
+    } = req.body || {};
 
     const nextVercelToken =
       vercel_token === undefined ? null : String(vercel_token).trim();
@@ -458,6 +562,26 @@ const updateDeploymentKeys = async (req, res, next) => {
       render_api_key === undefined ? null : String(render_api_key).trim();
     const nextRenderOwnerId =
       render_owner_id === undefined ? null : String(render_owner_id).trim();
+    const nextDockerCloudVpsHost =
+      docker_cloud_vps_host === undefined ? null : String(docker_cloud_vps_host).trim();
+    const nextDockerCloudVpsUser =
+      docker_cloud_vps_user === undefined ? null : String(docker_cloud_vps_user).trim();
+    const nextDockerCloudVpsPort =
+      docker_cloud_vps_port === undefined ? null : Number.parseInt(String(docker_cloud_vps_port), 10);
+    const nextDockerCloudSshKey =
+      docker_cloud_vps_ssh_private_key === undefined
+        ? null
+        : String(docker_cloud_vps_ssh_private_key).trim();
+    const nextDockerCloudDomain =
+      docker_cloud_domain === undefined ? null : String(docker_cloud_domain).trim().toLowerCase();
+    const nextDockerCloudApiDomain =
+      docker_cloud_api_domain === undefined ? null : String(docker_cloud_api_domain).trim().toLowerCase();
+    const nextDockerCloudSslEmail =
+      docker_cloud_ssl_email === undefined ? null : String(docker_cloud_ssl_email).trim();
+    const nextDockerCloudProvider =
+      docker_cloud_provider === undefined ? null : String(docker_cloud_provider).trim().toLowerCase();
+    const nextDockerCloudEnableKubernetes =
+      docker_cloud_enable_kubernetes === undefined ? null : Boolean(docker_cloud_enable_kubernetes);
 
     const result = await db.query(
       `UPDATE users
@@ -477,10 +601,79 @@ const updateDeploymentKeys = async (req, res, next) => {
            WHEN $3 = '' THEN NULL
            ELSE $3
          END,
+         docker_cloud_vps_host = CASE
+           WHEN $4::text IS NULL THEN docker_cloud_vps_host
+           WHEN $4 = '' THEN NULL
+           ELSE $4
+         END,
+         docker_cloud_vps_user = CASE
+           WHEN $5::text IS NULL THEN docker_cloud_vps_user
+           WHEN $5 = '' THEN NULL
+           ELSE $5
+         END,
+         docker_cloud_vps_port = CASE
+           WHEN $6::int IS NULL THEN docker_cloud_vps_port
+           ELSE $6
+         END,
+         docker_cloud_vps_ssh_private_key = CASE
+           WHEN $7::text IS NULL THEN docker_cloud_vps_ssh_private_key
+           WHEN $7 = '' THEN NULL
+           ELSE $7
+         END,
+         docker_cloud_domain = CASE
+           WHEN $8::text IS NULL THEN docker_cloud_domain
+           WHEN $8 = '' THEN NULL
+           ELSE $8
+         END,
+         docker_cloud_api_domain = CASE
+           WHEN $9::text IS NULL THEN docker_cloud_api_domain
+           WHEN $9 = '' THEN NULL
+           ELSE $9
+         END,
+         docker_cloud_ssl_email = CASE
+           WHEN $10::text IS NULL THEN docker_cloud_ssl_email
+           WHEN $10 = '' THEN NULL
+           ELSE $10
+         END,
+         docker_cloud_provider = CASE
+           WHEN $11::text IS NULL THEN docker_cloud_provider
+           WHEN $11 = '' THEN NULL
+           ELSE $11
+         END,
+         docker_cloud_enable_kubernetes = CASE
+           WHEN $12::boolean IS NULL THEN docker_cloud_enable_kubernetes
+           ELSE $12
+         END,
          updated_at = NOW()
-       WHERE id = $4
-       RETURNING vercel_token, render_api_key, render_owner_id`,
-      [nextVercelToken, nextRenderApiKey, nextRenderOwnerId, req.user.id]
+       WHERE id = $13
+       RETURNING
+         vercel_token,
+         render_api_key,
+         render_owner_id,
+         docker_cloud_vps_host,
+         docker_cloud_vps_user,
+         docker_cloud_vps_port,
+         docker_cloud_domain,
+         docker_cloud_api_domain,
+         docker_cloud_ssl_email,
+         docker_cloud_provider,
+         docker_cloud_enable_kubernetes,
+         docker_cloud_vps_ssh_private_key`,
+      [
+        nextVercelToken,
+        nextRenderApiKey,
+        nextRenderOwnerId,
+        nextDockerCloudVpsHost,
+        nextDockerCloudVpsUser,
+        Number.isFinite(nextDockerCloudVpsPort) ? nextDockerCloudVpsPort : null,
+        nextDockerCloudSshKey,
+        nextDockerCloudDomain,
+        nextDockerCloudApiDomain,
+        nextDockerCloudSslEmail,
+        nextDockerCloudProvider,
+        nextDockerCloudEnableKubernetes,
+        req.user.id,
+      ]
     );
 
     if (result.rows.length === 0) {
@@ -489,11 +682,21 @@ const updateDeploymentKeys = async (req, res, next) => {
 
     const row = result.rows[0];
     return res.json({
-      message: 'Deployment keys updated successfully.',
+      message: 'Deployment settings updated successfully.',
       keys: {
+        has_genesis_deploy: true,
         has_vercel_token: Boolean(row.vercel_token),
         has_render_api_key: Boolean(row.render_api_key),
         render_owner_id: row.render_owner_id || '',
+        docker_cloud_vps_host: row.docker_cloud_vps_host || '',
+        docker_cloud_vps_user: row.docker_cloud_vps_user || '',
+        docker_cloud_vps_port: row.docker_cloud_vps_port || 22,
+        docker_cloud_domain: row.docker_cloud_domain || '',
+        docker_cloud_api_domain: row.docker_cloud_api_domain || '',
+        docker_cloud_ssl_email: row.docker_cloud_ssl_email || '',
+        docker_cloud_provider: row.docker_cloud_provider || 'vps',
+        docker_cloud_enable_kubernetes: Boolean(row.docker_cloud_enable_kubernetes),
+        has_docker_cloud_vps_ssh_private_key: Boolean(row.docker_cloud_vps_ssh_private_key),
       },
     });
   } catch (err) {

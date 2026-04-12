@@ -139,41 +139,100 @@ function resolveModel(modelName) {
   return DEFAULT_MODEL;
 }
 
-const SYSTEM_PROMPT = `You are Genesis.ai, an expert full-stack developer AI. You generate complete, production-ready project files based on user prompts.
+const SYSTEM_PROMPT = `You are Genesis.ai — a world-class full-stack developer AI that produces PRODUCTION-GRADE, POLISHED software indistinguishable from products built by top engineering teams. Every app you generate must look, feel, and function like a real SaaS product ready for paying customers.
 
-RULES:
-1. Return ONLY valid JSON - no markdown, no code fences, no explanations
-2. The JSON must be an object where keys are file paths and values are file contents
-3. Generate a complete, working project with proper frontend and backend
-4. Include package.json files with all needed dependencies
-5. Include proper .gitignore
-6. Frontend should use React with Vite and Tailwind CSS
-7. Backend should use Express.js with proper routing
-8. Include a README.md with setup instructions
-9. All code must be clean, well-structured, and production-ready
-10. Connect frontend to backend with proper API calls using fetch or axios
-11. Include proper error handling and loading states
-12. Frontend and backend MUST be connected and runnable locally without extra manual fixes
-13. Frontend must call backend APIs via '/api' paths (not hardcoded localhost URLs)
-14. Backend must expose GET /api/health route returning { status: "ok" }
+OUTPUT FORMAT:
+1. Return ONLY valid JSON — no markdown, no code fences, no explanations
+2. Keys = file paths, values = complete file contents
+3. Return ONLY the JSON object. No other text.
+
+═══════════════════════════════════════
+UI/UX DESIGN QUALITY (THIS IS CRITICAL)
+═══════════════════════════════════════
+1. TYPOGRAPHY: Use Inter or system-ui font stack. Clean hierarchy — large bold headings (text-3xl/4xl font-bold), medium subheadings (text-lg text-gray-600), readable body text (text-sm/base)
+2. COLOR SYSTEM: Use a cohesive, professional palette. Primary color with 50-900 shades (e.g. indigo, violet, blue). NO plain red/blue/green. Use subtle backgrounds (gray-50, slate-50), card backgrounds (white with shadow-sm), and accent gradients
+3. CARDS & CONTAINERS: Rounded corners (rounded-xl), subtle shadows (shadow-sm hover:shadow-md transition-shadow), clean borders (border border-gray-200), proper padding (p-6)
+4. ANIMATIONS & TRANSITIONS: Add transition-all duration-200 on interactive elements. Hover effects on cards (hover:shadow-lg hover:-translate-y-0.5). Button hover states (hover:bg-primary-700). Smooth page transitions. Loading spinners with animate-spin
+5. BUTTONS: Rounded (rounded-lg), proper padding (px-4 py-2.5), font-medium, transition colors, focus:ring-2 focus:ring-offset-2. Primary (bg-indigo-600 text-white hover:bg-indigo-700), Secondary (bg-white border border-gray-300 hover:bg-gray-50), Danger (bg-red-600 text-white hover:bg-red-700)
+6. FORMS: Clean labels above inputs, rounded inputs with borders (rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500), helpful placeholder text, inline validation with red/green indicators, proper spacing (space-y-4)
+7. NOTIFICATIONS: Use react-hot-toast for success/error/info toasts. Include toast({ success: green, error: red }) on all user actions (create, update, delete, login, register)
+8. LOADING STATES: Skeleton loading placeholders for lists (animated pulse bars), centered spinners for page loads, disabled buttons with spinner while submitting
+9. EMPTY STATES: Friendly illustrations or icons with helpful messages ("No items yet. Create your first one!" with a CTA button)
+10. ERROR STATES: Clear error messages with retry buttons, form validation errors inline below inputs
+11. NAVIGATION: Clean sidebar or top navbar with active state indicators, mobile hamburger menu, user avatar/dropdown for auth
+12. RESPONSIVE: Mobile-first. Grid layouts (grid-cols-1 md:grid-cols-2 lg:grid-cols-3). Stack on mobile, side-by-side on desktop. Proper padding on all screen sizes
+13. TABLES: Clean data tables with hover rows (hover:bg-gray-50), proper headers, pagination controls below
+14. MODALS: Backdrop blur, centered, rounded-2xl, proper close button, animate entrance
+15. BADGES & STATUS: Colored badges for statuses (bg-green-100 text-green-800 for active, bg-yellow-100 text-yellow-800 for pending)
+
+═══════════════════════════════════════
+BACKEND ARCHITECTURE (MANDATORY)
+═══════════════════════════════════════
+1. Layered architecture: routes → controllers → services → models (SEPARATE files per resource)
+2. Centralized error handler middleware (server/middleware/errorHandler.js)
+3. Async handler wrapper (server/middleware/asyncHandler.js)
+4. Config module (server/config/) for environment variables
+5. Input validation middleware
+6. Proper HTTP status codes (200, 201, 400, 401, 404, 409, 500)
+7. Database layer:
+   - "fullstack" or "PERN" stacks: PostgreSQL with pg driver + schema SQL
+   - All other stacks: SQLite via better-sqlite3 with db.js connection + schema init
+   - ALL data persisted in database — NO in-memory arrays
+   - Include seed data or initial schema
+8. .env and .env.example with all needed variables
+9. Security: helmet, cors, morgan, compression, express-rate-limit
+10. Proper .gitignore
+
+═══════════════════════════════════════
+FRONTEND ARCHITECTURE (MANDATORY)
+═══════════════════════════════════════
+1. Component-based architecture: components/, pages/, services/, context/, hooks/ directories
+2. API service layer (client/src/services/api.js) using axios with interceptors for auth tokens and error handling
+3. Every page handles: loading (skeleton), error (retry), empty (CTA) states
+4. React Router with nested layouts, protected route wrapper, 404 page
+5. Tailwind CSS — professional, modern, polished design
+6. React Context for auth state (AuthContext with login/register/logout)
+7. Custom hooks for data fetching (useApi pattern with loading/error/data)
+8. Reusable components: Button, Input, Card, Modal, Badge, LoadingSpinner, EmptyState, Pagination
+9. react-hot-toast for all user action feedback
+10. Client-side form validation with clear error messages
+
+═══════════════════════════════════════
+BUSINESS LOGIC (MANDATORY)
+═══════════════════════════════════════
+1. At LEAST 2-3 real CRUD features end-to-end (UI → API → DB → response)
+2. User authentication: register, login, JWT tokens, protected routes, logout
+3. NO placeholder data or TODO stubs
+4. Pagination for list endpoints (page, limit, total count)
+5. Search/filter functionality
+6. Proper data relationships (foreign keys, user ownership)
+
+═══════════════════════════════════════
+CONNECTIVITY & DOCS
+═══════════════════════════════════════
+1. Frontend calls backend via '/api' paths (no hardcoded localhost)
+2. Backend GET /api/health returns { status: "ok" }
+3. Vite proxy for /api → backend
+4. Comprehensive README.md with features, tech stack, setup, API docs, folder structure
 
 STACK OPTIONS:
-- "nextjs-express": Next.js frontend + Express.js backend
-- "react-express": React (Vite) frontend + Express.js backend
-- "react-node": React (Vite) frontend + Node.js backend
-- "vue-node": Vue frontend + Node.js backend
-- "nuxt-express": Nuxt frontend + Express.js backend
-- "sveltekit-node": SvelteKit frontend + Node.js backend
-- "astro-express": Astro frontend + Express.js backend
-- "fullstack": Complete PERN stack with PostgreSQL schema
-
-IMPORTANT: Return ONLY the JSON object. No other text.`;
+- "nextjs-express": Next.js + Express.js
+- "react-express": React (Vite) + Express.js
+- "react-node": React (Vite) + Node.js
+- "vue-node": Vue + Node.js
+- "nuxt-express": Nuxt + Express.js
+- "sveltekit-node": SvelteKit + Node.js
+- "astro-express": Astro + Express.js
+- "fullstack": PERN (PostgreSQL + Express + React + Node.js)`;
 
 function cleanJsonResponse(text) {
   let cleaned = text.trim();
   if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7);
   else if (cleaned.startsWith('```')) cleaned = cleaned.slice(3);
   if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3);
+  // Sanitize control characters that break JSON.parse (tabs/newlines inside string values).
+  // Replace raw control chars (except \n, \r, \t) with spaces, then fix unescaped newlines/tabs inside strings.
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ');
   return cleaned.trim();
 }
 
@@ -265,10 +324,18 @@ function fallbackClientPackage() {
       dependencies: {
         react: '^18.2.0',
         'react-dom': '^18.2.0',
+        'react-router-dom': '^6.22.0',
+        axios: '^1.6.7',
+        'lucide-react': '^0.344.0',
+        'react-hot-toast': '^2.4.1',
+        'clsx': '^2.1.0',
       },
       devDependencies: {
         vite: '^5.2.0',
         '@vitejs/plugin-react': '^4.2.1',
+        tailwindcss: '^3.4.1',
+        postcss: '^8.4.35',
+        autoprefixer: '^10.4.17',
       },
     },
     null,
@@ -283,12 +350,20 @@ function fallbackServerPackage() {
       version: '1.0.0',
       type: 'module',
       scripts: {
-        dev: 'node index.js',
+        dev: 'node --watch index.js',
         start: 'node index.js',
       },
       dependencies: {
         cors: '^2.8.5',
         express: '^4.21.0',
+        helmet: '^7.1.0',
+        morgan: '^1.10.0',
+        compression: '^1.7.4',
+        'express-rate-limit': '^7.1.5',
+        'better-sqlite3': '^11.3.0',
+        dotenv: '^16.4.5',
+        jsonwebtoken: '^9.0.2',
+        bcryptjs: '^2.4.3',
       },
     },
     null,
@@ -334,26 +409,53 @@ function ensureCoreFiles(files, prompt) {
   }
 
   if (!output['server/index.js']) {
-    output['server/index.js'] = `import express from 'express';
+    output['server/index.js'] = `import 'dotenv/config';
+import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
-app.use(express.json());
+// Security & performance middleware
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+app.use(compression());
+app.use(morgan('dev'));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
 
+// Rate limiting
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
+app.use('/api/', limiter);
+
+// Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.post('/api/echo', (req, res) => {
-  res.json({ reply: req.body?.message || 'Hello from backend' });
+// TODO: Import and mount your route files here
+// import itemRoutes from './routes/items.js';
+// app.use('/api/items', itemRoutes);
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  const status = err.statusCode || 500;
+  res.status(status).json({
+    error: err.message || 'Internal Server Error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  });
 });
 
 app.listen(PORT, () => {
-  console.log('Server running on port ' + PORT);
+  console.log(\`Server running on port \${PORT} in \${process.env.NODE_ENV || 'development'} mode\`);
 });
+
+export default app;
 `;
   }
 
@@ -363,9 +465,12 @@ app.listen(PORT, () => {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <title>Generated App</title>
   </head>
-  <body>
+  <body class="font-sans antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
@@ -376,31 +481,143 @@ app.listen(PORT, () => {
   if (!output['client/src/main.jsx']) {
     output['client/src/main.jsx'] = `import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { Toaster } from 'react-hot-toast';
 import App from './App';
+import './index.css';
 
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+    <Toaster
+      position="top-right"
+      toastOptions={{
+        duration: 3000,
+        style: { borderRadius: '12px', background: '#1f2937', color: '#f9fafb', fontSize: '14px' },
+        success: { iconTheme: { primary: '#10b981', secondary: '#f9fafb' } },
+        error: { iconTheme: { primary: '#ef4444', secondary: '#f9fafb' } },
+      }}
+    />
+  </React.StrictMode>
+);
+`;
+  }
+
+  // Ensure index.css with Tailwind directives and base styles
+  if (!output['client/src/index.css']) {
+    output['client/src/index.css'] = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply bg-gray-50 text-gray-900 antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+  }
+  .input-field {
+    @apply block w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 transition-colors duration-200 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500;
+  }
+  .card {
+    @apply rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow duration-200 hover:shadow-md;
+  }
+}
+`;
+  }
+
+  // Ensure tailwind.config.js
+  if (!output['client/tailwind.config.js']) {
+    output['client/tailwind.config.js'] = `/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+};
+`;
+  }
+
+  // Ensure postcss.config.js
+  if (!output['client/postcss.config.js']) {
+    output['client/postcss.config.js'] = `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
 `;
   }
 
   if (!output['client/src/App.jsx']) {
     output['client/src/App.jsx'] = `import { useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 
-export default function App() {
-  const [health, setHealth] = useState('Checking backend...');
+function Layout({ children }) {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            <Link to="/" className="text-xl font-bold text-indigo-600">App</Link>
+            <div className="flex gap-4">
+              <Link to="/" className="text-gray-700 hover:text-indigo-600 transition">Home</Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+    </div>
+  );
+}
+
+function Home() {
+  const [health, setHealth] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetch('/api/health')
-      .then((r) => r.json())
-      .then((d) => setHealth(d.status === 'ok' ? 'Backend connected' : 'Backend unavailable'))
-      .catch(() => setHealth('Backend unavailable'));
+      .then((r) => { if (!r.ok) throw new Error('Backend unavailable'); return r.json(); })
+      .then((d) => { setHealth(d); setLoading(false); })
+      .catch((e) => { setError(e.message); setLoading(false); });
   }, []);
 
+  if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>;
+  if (error) return <div className="text-center py-20"><p className="text-red-500 mb-4">{error}</p><button onClick={() => window.location.reload()} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Retry</button></div>;
+
   return (
-    <main style={{ fontFamily: 'sans-serif', padding: 24 }}>
-      <h1>Generated Application</h1>
-      <p>Prompt: ${JSON.stringify(prompt)}</p>
-      <p>{health}</p>
-    </main>
+    <div className="text-center py-20">
+      <h1 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Your App</h1>
+      <p className="text-gray-600 mb-2">Backend Status: <span className="text-green-600 font-semibold">{health?.status === 'ok' ? 'Connected' : 'Unavailable'}</span></p>
+      <p className="text-sm text-gray-400">Start building your features!</p>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
   );
 }
 `;
@@ -408,8 +625,10 @@ export default function App() {
 
   if (!output['client/vite.config.js']) {
     output['client/vite.config.js'] = `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
   server: {
     host: true,
     port: 5173,
@@ -417,10 +636,72 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
+        secure: false,
       },
     },
   },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+  },
 });
+`;
+  }
+
+  // Ensure API service layer exists
+  if (!output['client/src/services/api.js']) {
+    output['client/src/services/api.js'] = `import axios from 'axios';
+
+const api = axios.create({
+  baseURL: '/api',
+  timeout: 15000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+// Request interceptor for auth tokens
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) config.headers.Authorization = \`Bearer \${token}\`;
+  return config;
+});
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+`;
+  }
+
+  // Ensure .env.example exists for documentation
+  if (!output['server/.env.example']) {
+    output['server/.env.example'] = `PORT=5000
+NODE_ENV=development
+JWT_SECRET=your_jwt_secret_here
+DATABASE_URL=./database.db
+CLIENT_URL=http://localhost:5173
+`;
+  }
+
+  // Ensure .gitignore exists
+  if (!output['.gitignore']) {
+    output['.gitignore'] = `node_modules/
+dist/
+build/
+.env
+*.db
+*.sqlite
+.DS_Store
+*.log
+coverage/
 `;
   }
 
@@ -506,6 +787,74 @@ function parseAndValidateFiles(content, prompt) {
   return ensureCoreFiles(normalized, prompt);
 }
 
+// ---- Continuation for truncated responses ----
+
+async function continueJsonResponse(modelId, partialJson) {
+  // Only send the last ~3000 chars as context — sending 85K+ chars causes the LLM
+  // to return malformed JSON. The model only needs the tail to know where to continue.
+  const tailLength = 3000;
+  const tail = partialJson.length > tailLength
+    ? '... (earlier content omitted) ...\n' + partialJson.slice(-tailLength)
+    : partialJson;
+
+  const continuationPrompt = `The previous response was truncated. Here is the END of the partial JSON output so far:
+
+${tail}
+
+Please CONTINUE the JSON output from EXACTLY where it was cut off. Do NOT repeat any content that was already generated. Output ONLY the remaining JSON content to complete the object. Do not wrap in markdown.`;
+
+  const systemContinue = `You are continuing a truncated JSON response. Output ONLY the remaining JSON content. Do NOT repeat any already-generated content. Do NOT add markdown or explanations.`;
+
+  const continuation = await callModel(modelId, systemContinue, continuationPrompt);
+  return cleanJsonResponse(continuation);
+}
+
+function mergeJsonParts(part1, part2) {
+  // Remove trailing incomplete data from part1 and leading incomplete data from part2
+  let merged = part1.trimEnd();
+  let rest = part2.trim();
+
+  // If part1 ends abruptly (no closing brace), try to splice
+  if (!merged.endsWith('}')) {
+    // Find the last complete key-value pair
+    const lastComma = merged.lastIndexOf(',');
+    const lastColon = merged.lastIndexOf(':');
+    const lastCloseBrace = merged.lastIndexOf('}');
+    const lastCloseQuote = merged.lastIndexOf('"');
+
+    // If we're mid-value, trim back to last comma
+    if (lastComma > lastCloseBrace && lastComma > 0) {
+      merged = merged.slice(0, lastComma);
+    }
+  }
+
+  // Remove opening brace from continuation if present
+  if (rest.startsWith('{')) {
+    rest = rest.slice(1);
+  }
+  // Remove closing brace from part1 if present at the end
+  if (merged.endsWith('}')) {
+    merged = merged.slice(0, -1);
+  }
+
+  // Ensure proper comma separation
+  const trimmedMerged = merged.trimEnd();
+  const trimmedRest = rest.trimStart();
+  if (trimmedRest && !trimmedMerged.endsWith(',') && !trimmedRest.startsWith(',') && !trimmedRest.startsWith('}')) {
+    merged = trimmedMerged + ',';
+  } else {
+    merged = trimmedMerged;
+  }
+
+  const result = merged + '\n' + rest;
+
+  // Ensure it ends with }
+  if (!result.trimEnd().endsWith('}')) {
+    return result.trimEnd() + '\n}';
+  }
+  return result;
+}
+
 async function generateWithModel(modelId, userPrompt, promptForFallback) {
   const strictUserPrompt = `${userPrompt}
 
@@ -513,7 +862,8 @@ CRITICAL OUTPUT RULES:
 - Output must be a single valid JSON object only.
 - Do not wrap in markdown.
 - Do not include explanatory text.
-- Keep implementation concise and working over feature breadth.
+- Generate COMPLETE, FULL file contents for every file. Do not truncate or summarize code.
+- Prioritize generating complete, working code over adding more features.
 - Do not include node_modules, dist, build output, or lock files.`;
 
   let lastErr = null;
@@ -521,13 +871,35 @@ CRITICAL OUTPUT RULES:
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       const content = await callModel(modelId, SYSTEM_PROMPT, strictUserPrompt);
-      const files = parseAndValidateFiles(content, promptForFallback);
-      return files;
+
+      // Check if response was truncated
+      if (isLikelyTruncatedJson(content)) {
+        console.log(`[aiGenerator] Response truncated on attempt ${attempt}, trying continuation...`);
+        try {
+          const continuation = await continueJsonResponse(modelId, content);
+          const merged = mergeJsonParts(content, continuation);
+
+          // If still truncated after one continuation, try one more
+          if (isLikelyTruncatedJson(merged)) {
+            const continuation2 = await continueJsonResponse(modelId, merged);
+            const merged2 = mergeJsonParts(merged, continuation2);
+            const files = parseAndValidateFiles(merged2, promptForFallback);
+            return files;
+          }
+
+          const files = parseAndValidateFiles(merged, promptForFallback);
+          return files;
+        } catch (contErr) {
+          console.warn(`[aiGenerator] Continuation failed: ${contErr.message}`);
+          // Fall through to retry
+        }
+      } else {
+        const files = parseAndValidateFiles(content, promptForFallback);
+        return files;
+      }
     } catch (err) {
       lastErr = err;
-      if (attempt < 3 && isLikelyTruncatedJson(err?.message ? String(err.message) : '')) {
-        continue;
-      }
+      console.warn(`[aiGenerator] Attempt ${attempt} failed: ${err.message}`);
     }
   }
 
@@ -544,7 +916,7 @@ async function callGemini(modelId, messages) {
     model: modelId,
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 65536,
+      maxOutputTokens: 1000000,
       responseMimeType: 'application/json',
     },
   });
@@ -561,7 +933,7 @@ async function callOpenAI(modelId, systemPrompt, userPrompt) {
   const params = {
     model: modelId,
     temperature: 0.7,
-    max_tokens: 16384,
+    max_tokens: 65536,
     response_format: { type: 'json_object' },
     messages: [
       { role: 'system', content: systemPrompt },
@@ -590,7 +962,7 @@ async function callAnthropic(modelId, systemPrompt, userPrompt) {
 
   const result = await client.messages.create({
     model: resolvedModelId,
-    max_tokens: 16384,
+    max_tokens: 64000,
     temperature: 0.7,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
@@ -607,7 +979,7 @@ async function callMistral(modelId, systemPrompt, userPrompt) {
   const result = await client.chat.completions.create({
     model: modelId,
     temperature: 0.7,
-    max_tokens: 16384,
+    max_tokens: 32768,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -624,7 +996,7 @@ async function callXAI(modelId, systemPrompt, userPrompt) {
   const result = await client.chat.completions.create({
     model: modelId,
     temperature: 0.7,
-    max_tokens: 16384,
+    max_tokens: 32768,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
@@ -655,27 +1027,178 @@ async function callModel(modelId, systemPrompt, userPrompt) {
 
 // ---- Exports ----
 
-const generateProject = async (prompt, stack, modelName) => {
-  try {
-    const modelId = resolveModel(modelName);
+// ---- Two-phase generation for large apps ----
 
-    const userPrompt = `Generate a complete full-stack project with the following requirements:
+async function generateProjectInPhases(modelId, prompt, stack) {
+  console.log(`[aiGenerator] Starting two-phase generation for large app...`);
+
+  // Phase 1: Generate backend
+  const backendPrompt = `Generate ONLY the BACKEND part of a production-grade full-stack project.
 
 Stack: ${stack}
 Project Description: ${prompt}
 
-Generate all necessary files for both frontend and backend. The frontend files should be under "client/" and backend files under "server/". Include package.json for both, proper configuration, and make sure the frontend connects to the backend API properly.
+Generate ONLY files under "server/" directory. This must be REAL production-quality backend code:
+1. server/package.json with ALL dependencies (express, cors, helmet, morgan, compression, express-rate-limit, better-sqlite3 or pg, dotenv, jsonwebtoken, bcryptjs)
+2. server/index.js - Production Express app with full middleware stack
+3. server/config/db.js - Database connection with schema initialization and seed data
+4. server/middleware/errorHandler.js - Centralized error handler with proper status codes
+5. server/middleware/asyncHandler.js - Async wrapper
+6. server/middleware/auth.js - JWT authentication middleware
+7. server/routes/ - One route file per resource, clean RESTful endpoints
+8. server/controllers/ - One controller per resource, input validation, proper responses
+9. server/services/ - Business logic per resource, database queries, pagination
+10. server/.env.example - All required environment variables documented
+11. Full JWT auth flow (register with password hashing, login with token generation, protected routes)
+12. ALL data persisted in database with proper schema (CREATE TABLE statements)
+13. Pagination (page, limit, offset) for all list endpoints
+14. Search/filter functionality
 
-Return the result as a JSON object where each key is a file path and each value is the file content string.`;
+Return ONLY a JSON object where keys are file paths (starting with "server/") and values are COMPLETE file contents.`;
+
+  console.log('[aiGenerator] Phase 1: Generating backend...');
+  const backendContent = await callModel(modelId, SYSTEM_PROMPT, backendPrompt);
+  let backendFiles;
+  try {
+    if (isLikelyTruncatedJson(backendContent)) {
+      const contd = await continueJsonResponse(modelId, backendContent);
+      backendFiles = extractJsonObject(mergeJsonParts(backendContent, contd));
+    } else {
+      backendFiles = extractJsonObject(backendContent);
+    }
+  } catch (e) {
+    console.warn('[aiGenerator] Phase 1 parse failed:', e.message);
+    throw e;
+  }
+
+  // Phase 2: Generate frontend
+  const backendFileList = Object.keys(backendFiles).join('\n');
+  const frontendPrompt = `Generate ONLY the FRONTEND part of a PRODUCTION-GRADE full-stack project. The UI must look like a REAL SaaS product — polished, professional, beautiful.
+
+Stack: ${stack}
+Project Description: ${prompt}
+
+The backend already exists with these files:
+${backendFileList}
+
+Generate ONLY files under "client/" directory. This must be PREMIUM UI quality:
+
+PACKAGE & CONFIG:
+1. client/package.json with ALL dependencies (react, react-dom, react-router-dom, axios, lucide-react, react-hot-toast, clsx, tailwindcss, postcss, autoprefixer, @vitejs/plugin-react)
+2. client/index.html with Inter font from Google Fonts
+3. client/vite.config.js with react plugin and /api proxy
+4. client/tailwind.config.js with Inter font family
+5. client/postcss.config.js
+
+SOURCE FILES:
+6. client/src/index.css with @tailwind directives AND custom component classes (btn-primary, btn-secondary, input-field, card)
+7. client/src/main.jsx with React.StrictMode and react-hot-toast Toaster (dark themed toasts)
+8. client/src/App.jsx with React Router, Layout component (clean navbar with active states), and all routes
+9. client/src/services/api.js - Axios with auth interceptors
+10. client/src/context/AuthContext.jsx - Auth state management
+
+PAGES (each with loading skeleton, error state with retry, empty state with CTA):
+11. client/src/pages/ - Login, Register, Dashboard, and pages for each CRUD feature
+12. Beautiful login/register forms with validation, branded design
+13. Dashboard with stats cards, recent activity
+
+COMPONENTS:
+14. client/src/components/ - Button, Input, Card, Modal, Badge, LoadingSpinner, EmptyState, Pagination, ProtectedRoute
+15. All buttons use rounded-lg, proper padding, hover/focus states, transitions
+16. Cards use rounded-xl, shadow-sm, hover:shadow-md, border-gray-200
+17. Use lucide-react icons throughout
+18. react-hot-toast on all user actions (create, update, delete, login, etc.)
+
+Also include: README.md (features, tech stack, setup, API docs), .gitignore
+
+Return ONLY a JSON object where keys are file paths and values are COMPLETE file contents.`;
+
+  console.log('[aiGenerator] Phase 2: Generating frontend...');
+  const frontendContent = await callModel(modelId, SYSTEM_PROMPT, frontendPrompt);
+  let frontendFiles;
+  try {
+    if (isLikelyTruncatedJson(frontendContent)) {
+      const contd = await continueJsonResponse(modelId, frontendContent);
+      frontendFiles = extractJsonObject(mergeJsonParts(frontendContent, contd));
+    } else {
+      frontendFiles = extractJsonObject(frontendContent);
+    }
+  } catch (e) {
+    console.warn('[aiGenerator] Phase 2 parse failed:', e.message);
+    throw e;
+  }
+
+  // Merge both phases
+  const mergedFiles = { ...normalizeFilesMap(backendFiles), ...normalizeFilesMap(frontendFiles) };
+  console.log(`[aiGenerator] Two-phase generation complete: ${Object.keys(mergedFiles).length} files`);
+  return ensureCoreFiles(mergedFiles, prompt);
+}
+
+const generateProject = async (prompt, stack, modelName) => {
+  try {
+    const modelId = resolveModel(modelName);
+
+    const userPrompt = `Generate a PRODUCTION-GRADE, POLISHED full-stack project that looks and works like a real SaaS product.
+
+Stack: ${stack}
+Project Description: ${prompt}
+
+QUALITY BAR — The app must look like it was built by a professional team:
+
+BACKEND (server/ directory):
+1. Layered architecture: routes/ → controllers/ → services/ (separate files per resource)
+2. Real database (better-sqlite3 or PostgreSQL) with schema, seed data, NO in-memory arrays
+3. JWT auth (register with bcrypt, login with token, auth middleware for protected routes)
+4. Error handler middleware, async handler wrapper
+5. helmet, cors, morgan, compression, rate-limit
+6. Pagination (page, limit) for list endpoints, search/filter
+7. .env.example with all variables documented
+
+FRONTEND (client/ directory) — PREMIUM UI QUALITY:
+1. Inter font (Google Fonts), Tailwind CSS with custom component classes
+2. Cohesive color palette (indigo/violet primary with proper shade usage)
+3. Cards: rounded-xl, shadow-sm, hover:shadow-md, border-gray-200, transitions
+4. Buttons: rounded-lg, proper padding, font-medium, hover/focus states with ring
+5. Forms: clean labels, rounded inputs, focus:ring, inline validation, proper spacing
+6. react-hot-toast for ALL user actions (create/update/delete/login/register)
+7. Loading: skeleton pulse for lists, spinner for pages, disabled+spinner on button submit
+8. Empty states: icon + message + CTA button
+9. Error states: message + retry button
+10. React Router with Layout, protected routes, 404 page
+11. AuthContext for login state management
+12. API service layer with axios interceptors
+13. lucide-react icons throughout
+14. Responsive grid (grid-cols-1 md:grid-cols-2 lg:grid-cols-3)
+15. At least 2-3 COMPLETE CRUD features end-to-end
+
+Include: package.json with ALL deps, README.md, .gitignore
+IMPORTANT: Generate COMPLETE file contents. Do NOT truncate or leave placeholders.
+
+Return as JSON object: keys = file paths, values = complete file content strings.`;
 
     try {
+      // First try: single-pass generation with continuation support
       return await generateWithModel(modelId, userPrompt, prompt);
     } catch (primaryErr) {
-      // Fallback to default model if a non-default model repeatedly fails.
-      if (modelId !== DEFAULT_MODEL) {
-        return await generateWithModel(DEFAULT_MODEL, userPrompt, prompt);
+      console.warn(`[aiGenerator] Single-pass failed: ${primaryErr.message}. Trying two-phase generation...`);
+
+      try {
+        // Second try: two-phase generation (backend first, then frontend)
+        return await generateProjectInPhases(modelId, prompt, stack);
+      } catch (phaseErr) {
+        console.warn(`[aiGenerator] Two-phase failed with ${modelId}: ${phaseErr.message}`);
+
+        // Third try: fallback to default model with two-phase
+        if (modelId !== DEFAULT_MODEL) {
+          try {
+            return await generateProjectInPhases(DEFAULT_MODEL, prompt, stack);
+          } catch (fallbackErr) {
+            console.error('[aiGenerator] All generation strategies failed.');
+            throw fallbackErr;
+          }
+        }
+        throw phaseErr;
       }
-      throw primaryErr;
     }
   } catch (err) {
     console.error('AI Generation error:', err);
@@ -688,7 +1211,7 @@ const editProject = async (currentFiles, originalPrompt, editPrompt, stack, mode
     const modelId = resolveModel(modelName);
     const filesSummary = Object.keys(currentFiles).join('\n');
 
-    const userPrompt = `I have an existing project with these files:
+    const userPrompt = `I have an existing SCALABLE project with these files:
 ${filesSummary}
 
 Original project description: ${originalPrompt}
@@ -698,7 +1221,14 @@ ${JSON.stringify(currentFiles, null, 2)}
 
 EDIT REQUEST: ${editPrompt}
 
-Apply the requested changes to the project. Return the COMPLETE updated project files as a JSON object (include ALL files, both modified and unmodified). Make sure frontend and backend remain properly connected.`;
+Apply the requested changes while MAINTAINING the scalable architecture:
+- Keep the layered backend pattern (routes → controllers → services → models)
+- Keep database persistence (do NOT switch to in-memory arrays)
+- Keep the API service layer on frontend
+- Keep proper error handling and loading states
+- Add any new dependencies to package.json
+
+Return the COMPLETE updated project files as a JSON object (include ALL files, both modified and unmodified). Make sure frontend and backend remain properly connected.`;
 
     try {
       return await generateWithModel(modelId, userPrompt, originalPrompt);

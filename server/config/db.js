@@ -13,6 +13,56 @@ function toInt(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function normalizeEnvConnectionString(value) {
+  const raw = String(value || '').trim();
+  return raw || null;
+}
+
+function deriveNeonDirectUrl(connectionString) {
+  try {
+    const parsed = new URL(String(connectionString));
+
+    if (!parsed.hostname.includes('-pooler.')) {
+      return null;
+    }
+
+    parsed.hostname = parsed.hostname.replace('-pooler.', '.');
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function maskConnectionString(value) {
+  try {
+    const parsed = new URL(String(value));
+    if (parsed.password) {
+      parsed.password = '***';
+    }
+    if (parsed.username) {
+      parsed.username = `${parsed.username.slice(0, 2)}***`;
+    }
+    return parsed.toString();
+  } catch {
+    return '[invalid-connection-string]';
+  }
+}
+
+function getConnectionStringCandidates() {
+  const values = [
+    process.env.DATABASE_URL,
+    process.env.DATABASE_URL_FALLBACK,
+    process.env.DB_DIRECT_URL,
+    process.env.DIRECT_DATABASE_URL,
+  ]
+    .map((value) => normalizeEnvConnectionString(value))
+    .filter(Boolean);
+
+  const derivedValues = values.map((value) => deriveNeonDirectUrl(value)).filter(Boolean);
+
+  return [...new Set([...derivedValues, ...values])];
+}
+
 function isServerlessRuntime() {
   return Boolean(
     process.env.VERCEL ||
@@ -25,15 +75,30 @@ function isServerlessRuntime() {
 
 function isTransientDbError(err) {
   const message = String(err?.message || '').toLowerCase();
+  const stack = String(err?.stack || '').toLowerCase();
+  const details = String(err || '').toLowerCase();
+  const code = String(err?.code || err?.errno || '').toLowerCase();
+
+  if (['57p01', '57p02', '57p03', '08000', '08003', '08006', '53300'].includes(code)) {
+    return true;
+  }
+
   return (
     message.includes('connection terminated') ||
     message.includes('connection refused') ||
     message.includes('connection timeout') ||
     message.includes('timeout') ||
+    message.includes('connection reset') ||
     message.includes('econnreset') ||
+    message.includes('ecancelled') ||
+    message.includes('enotfound') ||
+    message.includes('getaddrinfo') ||
+    message.includes('dns') ||
     message.includes('socket hang up') ||
     message.includes('server closed the connection unexpectedly') ||
-    message.includes('terminat')
+    message.includes('terminat') ||
+    stack.includes('connection terminated unexpectedly') ||
+    details.includes('connection terminated unexpectedly')
   );
 }
 
@@ -41,19 +106,153 @@ async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isPoolEnded(poolInstance) {
+  return Boolean(poolInstance?.ended || poolInstance?._ended);
+}
+
+function getPoolRegistry() {
+  if (!globalThis.__genesisPgPoolRegistry) {
+    globalThis.__genesisPgPoolRegistry = new Map();
+  }
+
+  return globalThis.__genesisPgPoolRegistry;
+}
+
+function createTrackedPool(connectionString) {
+  const trackedPool = new Pool({ ...poolConfig, connectionString });
+
+  trackedPool.on('error', (err) => {
+    const registry = getPoolRegistry();
+    const transient = isTransientDbError(err);
+    const label = transient ? 'Transient database error' : 'Unexpected database error';
+    const safeConnectionString = maskConnectionString(connectionString);
+
+    if (transient) {
+      console.warn(`${label} (${safeConnectionString}): ${String(err?.message || 'Unknown error')}`);
+    } else {
+      console.error(`${label} (${safeConnectionString}):`, err);
+    }
+
+    if (registry.get(connectionString) === trackedPool && (transient || isPoolEnded(trackedPool))) {
+      registry.delete(connectionString);
+      trackedPool
+        .end()
+        .catch(() => {
+          // Ignore shutdown errors for broken pools.
+        });
+    }
+  });
+
+  return trackedPool;
+}
+
+function getTrackedPool(connectionString) {
+  const registry = getPoolRegistry();
+  const existingPool = registry.get(connectionString);
+
+  if (existingPool && !isPoolEnded(existingPool)) {
+    return existingPool;
+  }
+
+  const nextPool = createTrackedPool(connectionString);
+  registry.set(connectionString, nextPool);
+  return nextPool;
+}
+
+async function invalidateTrackedPool(connectionString, poolInstance) {
+  const registry = getPoolRegistry();
+
+  if (registry.get(connectionString) !== poolInstance) {
+    return;
+  }
+
+  registry.delete(connectionString);
+
+  try {
+    await poolInstance.end();
+  } catch {
+    // The pool is already broken or shutting down; a fresh pool will be created on retry.
+  }
+}
+
+async function connectWithRetry() {
+  const maxAttempts = Math.max(4, connectionStringCandidates.length * 3);
+  const preferDirectConnections = connectionStringCandidates.some((url) => url?.includes('pooler.neon'));
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let currentConnectionString;
+
+    if (preferDirectConnections && attempt === 1) {
+      const directUrl = connectionStringCandidates.find((url) => !url?.includes('pooler.neon'));
+      if (directUrl) {
+        currentConnectionString = directUrl;
+      } else {
+        currentConnectionString = connectionStringCandidates[0];
+      }
+    } else {
+      currentConnectionString = connectionStringCandidates[(attempt - 1) % connectionStringCandidates.length];
+    }
+
+    const currentPool = getTrackedPool(currentConnectionString);
+
+    try {
+      await schemaReady;
+      return await currentPool.connect();
+    } catch (err) {
+      if (attempt < maxAttempts && isTransientDbError(err)) {
+        await invalidateTrackedPool(currentConnectionString, currentPool);
+        await sleep(250 * attempt);
+        continue;
+      }
+
+      throw err;
+    }
+  }
+
+  throw new Error('Database connection failed after retries.');
+}
+
+async function closeTrackedPools() {
+  const registry = getPoolRegistry();
+  const pools = [...registry.values()];
+  registry.clear();
+
+  await Promise.all(
+    pools.map(async (instance) => {
+      try {
+        await instance.end();
+      } catch {
+        // Ignore failures while shutting down broken/stale pools.
+      }
+    })
+  );
+}
+
 const serverlessRuntime = isServerlessRuntime();
+const connectionStringCandidates = getConnectionStringCandidates();
+
+if (connectionStringCandidates.length === 0) {
+  throw new Error(
+    'Database configuration missing. Set DATABASE_URL (and optionally DATABASE_URL_FALLBACK/DB_DIRECT_URL).'
+  );
+}
+
+const isNeonPooler = connectionStringCandidates[0]?.includes('pooler.neon');
 
 const poolConfig = {
-  connectionString: process.env.DATABASE_URL,
-  max: toInt(process.env.DB_POOL_MAX, serverlessRuntime ? 1 : 40),
-  min: toInt(process.env.DB_POOL_MIN, serverlessRuntime ? 0 : 5),
-  idleTimeoutMillis: toInt(process.env.DB_IDLE_TIMEOUT_MS, serverlessRuntime ? 10000 : 30000),
-  connectionTimeoutMillis: toInt(process.env.DB_CONNECTION_TIMEOUT_MS, serverlessRuntime ? 15000 : 5000),
-  query_timeout: toInt(process.env.DB_QUERY_TIMEOUT_MS, serverlessRuntime ? 30000 : 15000),
-  statement_timeout: toInt(process.env.DB_STATEMENT_TIMEOUT_MS, serverlessRuntime ? 45000 : 20000),
-  maxUses: toInt(process.env.DB_POOL_MAX_USES, 7500),
+  connectionString: connectionStringCandidates[0],
+  max: toInt(process.env.DB_POOL_MAX, isNeonPooler ? 3 : serverlessRuntime ? 1 : 40),
+  min: toInt(process.env.DB_POOL_MIN, isNeonPooler ? 0 : serverlessRuntime ? 0 : 5),
+  idleTimeoutMillis: toInt(
+    process.env.DB_IDLE_TIMEOUT_MS,
+    isNeonPooler ? 8000 : serverlessRuntime ? 10000 : 30000
+  ),
+  connectionTimeoutMillis: toInt(process.env.DB_CONNECTION_TIMEOUT_MS, serverlessRuntime ? 15000 : 10000),
+  query_timeout: toInt(process.env.DB_QUERY_TIMEOUT_MS, serverlessRuntime ? 30000 : 20000),
+  statement_timeout: toInt(process.env.DB_STATEMENT_TIMEOUT_MS, serverlessRuntime ? 45000 : 30000),
+  maxUses: toInt(process.env.DB_POOL_MAX_USES, isNeonPooler ? 500 : 7500),
   keepAlive: true,
-  keepAliveInitialDelayMillis: toInt(process.env.DB_KEEPALIVE_INITIAL_DELAY_MS, 10000),
+  keepAliveInitialDelayMillis: toInt(process.env.DB_KEEPALIVE_INITIAL_DELAY_MS, isNeonPooler ? 3000 : 10000),
 };
 
 if (String(process.env.DB_SSL || '').toLowerCase() === 'true') {
@@ -64,18 +263,16 @@ if (String(process.env.DB_SSL || '').toLowerCase() === 'true') {
 
 // Reuse one pool per runtime to avoid opening duplicate pools during hot reloads and warm serverless invocations.
 const globalPoolKey = '__genesisPgPool';
-const pool = globalThis[globalPoolKey] || new Pool(poolConfig);
-globalThis[globalPoolKey] = pool;
+const pool = globalThis[globalPoolKey] || getTrackedPool(connectionStringCandidates[0]);
 
-pool.on('error', (err) => {
-  console.error('Unexpected database error:', err);
-});
+globalThis[globalPoolKey] = pool;
 
 const schemaReady = serverlessRuntime
   ? Promise.resolve()
-  : pool
-      .query(
-        `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+  : (async () => {
+      try {
+        await pool.query(
+          `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
      ALTER TABLE IF EXISTS projects
      ADD COLUMN IF NOT EXISTS model VARCHAR(100) DEFAULT 'gemini-2.5-flash';
@@ -197,21 +394,24 @@ const schemaReady = serverlessRuntime
       CREATE INDEX IF NOT EXISTS idx_newsletter_issues_scheduled ON newsletter_issues(scheduled_at);
       CREATE INDEX IF NOT EXISTS idx_newsletter_articles_issue ON newsletter_articles(issue_id);
        CREATE INDEX IF NOT EXISTS idx_newsletter_articles_order ON newsletter_articles(order_index);`
-        )
-        .catch((err) => {
-          console.error('Schema migration failed:', err.message);
-          throw err;
-        });
+        );
+      } catch (err) {
+        console.error('Schema migration failed:', err.message);
+      }
+    })();
 
   async function queryWithRetry(text, params) {
-    const maxAttempts = 2;
+    const maxAttempts = Math.max(4, connectionStringCandidates.length * 3);
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const currentConnectionString = connectionStringCandidates[(attempt - 1) % connectionStringCandidates.length];
+      const currentPool = getTrackedPool(currentConnectionString);
       try {
         await schemaReady;
-        return await pool.query(text, params);
+        return await currentPool.query(text, params);
       } catch (err) {
         if (attempt < maxAttempts && isTransientDbError(err)) {
+          await invalidateTrackedPool(currentConnectionString, currentPool);
           await sleep(250 * attempt);
           continue;
         }
@@ -226,6 +426,12 @@ const schemaReady = serverlessRuntime
 const db = {
   query: async (text, params) => {
       return queryWithRetry(text, params);
+  },
+  connect: async () => {
+    return connectWithRetry();
+  },
+  close: async () => {
+    await closeTrackedPools();
   },
   pool,
 };

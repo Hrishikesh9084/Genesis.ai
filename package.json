@@ -2,6 +2,9 @@
   "name": "genesis-ai",
   "version": "1.0.0",
   "description": "AI-powered full-stack project generator, previewer, and deployer",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "server": "cd server && npm run dev",
     "client": "cd client && npm run dev",
@@ -11,7 +14,7 @@
     "start": "cd server && npm start"
   },
   "dependencies": {
+    "cloudinary": "^2.9.0",
     "concurrently": "^8.2.2"
   }
 }
-  

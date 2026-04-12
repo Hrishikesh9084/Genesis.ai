@@ -131,7 +131,7 @@ const featureGroups = [
       "Sign up and sign in with email and password",
       "Continue with GitHub or Google sign-in",
       "Buy credits to power generation and editing workflows",
-      "Manage profile details, avatars, GitHub token, and deployment keys from settings",
+      "Manage profile details, avatars, GitHub token, and Genesis deployment settings",
       "Use account-level controls to keep integration access secure",
       "Track credit usage while running generation and editing workflows",
     ],

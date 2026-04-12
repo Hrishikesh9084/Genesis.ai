@@ -24,21 +24,23 @@ try {
   console.warn('Warning: Could not create upload directories:', err.message);
 }
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, avatarDir);
-  },
-  filename: (req, file, cb) => {
-    const safeBase = path
-      .parse(file.originalname)
-      .name
-      .replace(/[^a-zA-Z0-9_-]/g, '')
-      .slice(0, 40) || 'avatar';
-    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `${req.user.id}-${safeBase}-${unique}${ext}`);
-  },
-});
+const avatarStorage = isServerless
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        cb(null, avatarDir);
+      },
+      filename: (req, file, cb) => {
+        const safeBase = path
+          .parse(file.originalname)
+          .name
+          .replace(/[^a-zA-Z0-9_-]/g, '')
+          .slice(0, 40) || 'avatar';
+        const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+        const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        cb(null, `${req.user.id}-${safeBase}-${unique}${ext}`);
+      },
+    });
 
 function fileFilter(_req, file, cb) {
   if (!file.mimetype?.startsWith('image/')) {
@@ -49,7 +51,7 @@ function fileFilter(_req, file, cb) {
 }
 
 const uploadAvatar = multer({
-  storage,
+  storage: avatarStorage,
   fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024,

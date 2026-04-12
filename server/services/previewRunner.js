@@ -51,12 +51,20 @@ function writeFiles(dir, files) {
   }
 }
 
-function runCmd(cmd, args, cwd, env) {
+function runCmd(cmd, args, cwd, env, logFn) {
   return new Promise((resolve, reject) => {
     const proc = spawn(cmd, args, { cwd, shell: true, stdio: 'pipe', env: { ...process.env, ...env } });
     let out = '', err = '';
-    proc.stdout.on('data', (d) => (out += d));
-    proc.stderr.on('data', (d) => (err += d));
+    proc.stdout.on('data', (d) => {
+      const line = d.toString();
+      out += line;
+      if (typeof logFn === 'function') logFn(line, 'stdout');
+    });
+    proc.stderr.on('data', (d) => {
+      const line = d.toString();
+      err += line;
+      if (typeof logFn === 'function') logFn(line, 'stderr');
+    });
     proc.on('close', (code) => (code === 0 ? resolve(out) : reject(new Error(err || out))));
     proc.on('error', reject);
   });
@@ -125,7 +133,14 @@ async function proxyApiRequest(req, res, backendPort) {
   res.send(responseBody);
 }
 
-async function startPreviewGateway({ projectDir, clientDir, backendPort, gatewayPort }) {
+function touchPreview(projectId) {
+  const preview = activePreviews.get(projectId);
+  if (!preview) return;
+  preview.lastAccessAt = Date.now();
+  activePreviews.set(projectId, preview);
+}
+
+async function startPreviewGateway({ projectId, projectDir, clientDir, backendPort, gatewayPort, maxConcurrency = 5 }) {
   const resolvedGatewayPort = gatewayPort || await getFreePort();
   const buildDir = getBuildOutputDir(clientDir);
   const staticIndex = path.join(buildDir, 'index.html');
@@ -135,6 +150,30 @@ async function startPreviewGateway({ projectDir, clientDir, backendPort, gateway
   }
 
   const app = express();
+
+  app.use((req, res, next) => {
+    const preview = activePreviews.get(projectId);
+    if (preview) {
+      preview.currentRequests = Number(preview.currentRequests || 0) + 1;
+      activePreviews.set(projectId, preview);
+    }
+    touchPreview(projectId);
+
+    if (preview && Number(preview.currentRequests || 0) > maxConcurrency) {
+      preview.currentRequests = Math.max(0, Number(preview.currentRequests || 1) - 1);
+      activePreviews.set(projectId, preview);
+      return res.status(503).json({ error: 'Service is busy, retry shortly.' });
+    }
+
+    res.on('finish', () => {
+      const current = activePreviews.get(projectId);
+      if (!current) return;
+      current.currentRequests = Math.max(0, Number(current.currentRequests || 1) - 1);
+      activePreviews.set(projectId, current);
+    });
+
+    next();
+  });
 
   app.use('/api', (req, res) => {
     proxyApiRequest(req, res, backendPort).catch((error) => {
@@ -205,7 +244,7 @@ function updateStatus(projectId, status, step, extra = {}) {
   activePreviews.set(projectId, { ...prev, status, step, ...extra });
 }
 
-async function startDevelopmentPreview(projectId, files, projectDir) {
+async function startDevelopmentPreview(projectId, files, projectDir, options = {}) {
   let backendProc = null;
   let frontendProc = null;
 
@@ -298,6 +337,7 @@ export default defineConfig({
         });
         backendProc.on('exit', (code) => {
           console.log(`[preview:backend:${projectId}] exited with code ${code}`);
+          updateStatus(projectId, 'error', `Backend exited with code ${code}`, { mode: 'development', lastExitAt: Date.now() });
         });
 
         try {
@@ -348,6 +388,7 @@ export default defineConfig({
       });
       frontendProc.on('exit', (code) => {
         console.log(`[preview:frontend:${projectId}] exited with code ${code}`);
+        updateStatus(projectId, 'error', `Frontend exited with code ${code}`, { mode: 'development', lastExitAt: Date.now() });
       });
     }
 
@@ -374,6 +415,9 @@ export default defineConfig({
       backendUrl,
       dir: projectDir,
       startedAt: Date.now(),
+      lastAccessAt: Date.now(),
+      runtimePolicy: options.runtimePolicy || null,
+      currentRequests: 0,
     });
 
     return activePreviews.get(projectId);
@@ -386,9 +430,13 @@ export default defineConfig({
   }
 }
 
-async function startProductionPreview(projectId, files, projectDir) {
+async function startProductionPreview(projectId, files, projectDir, options = {}) {
   let backendProc = null;
   let gatewayServer = null;
+  const runtimePolicy = options.runtimePolicy || {};
+  const memoryLimitMb = Number.parseInt(String(runtimePolicy.memory_limit_mb || runtimePolicy.memoryLimitMb || 512), 10);
+  const cpuLimitPercent = Number.parseInt(String(runtimePolicy.cpu_limit_percent || runtimePolicy.cpuLimitPercent || 100), 10);
+  const maxConcurrency = Math.max(1, Math.min(25, Math.round((Number.isFinite(cpuLimitPercent) ? cpuLimitPercent : 100) / 20)));
 
   updateStatus(projectId, 'starting', 'Writing project files...', { mode: 'production' });
 
@@ -456,6 +504,7 @@ async function startProductionPreview(projectId, files, projectDir) {
             ...process.env,
             PORT: String(backendPort),
             NODE_ENV: 'production',
+            NODE_OPTIONS: `${String(process.env.NODE_OPTIONS || '').trim()} --max-old-space-size=${Number.isFinite(memoryLimitMb) ? memoryLimitMb : 512}`.trim(),
             CLIENT_URL: previewUrl,
             API_URL: previewUrl,
             DATABASE_URL: process.env.DATABASE_URL || '',
@@ -476,6 +525,7 @@ async function startProductionPreview(projectId, files, projectDir) {
         });
         backendProc.on('exit', (code) => {
           console.log(`[preview:backend:${projectId}] exited with code ${code}`);
+          updateStatus(projectId, 'error', `Backend exited with code ${code}`, { mode: 'production', lastExitAt: Date.now() });
         });
 
         try {
@@ -497,10 +547,12 @@ async function startProductionPreview(projectId, files, projectDir) {
     const clientBuildDir = hasClient ? getBuildOutputDir(clientDir) : null;
     updateStatus(projectId, 'starting', 'Starting preview gateway...', { mode: 'production' });
     gatewayServer = await startPreviewGateway({
+      projectId,
       projectDir,
       clientDir,
       backendPort,
       gatewayPort,
+      maxConcurrency,
     });
 
     activePreviews.set(projectId, {
@@ -517,6 +569,9 @@ async function startProductionPreview(projectId, files, projectDir) {
       buildDir: clientBuildDir,
       dir: projectDir,
       startedAt: Date.now(),
+      lastAccessAt: Date.now(),
+      runtimePolicy,
+      currentRequests: 0,
     });
 
     return activePreviews.get(projectId);
@@ -542,8 +597,8 @@ const startPreview = async (projectId, files, options = {}) => {
 
   const projectDir = path.join(PREVIEWS_DIR, projectId);
   return mode === 'development'
-    ? startDevelopmentPreview(projectId, files, projectDir)
-    : startProductionPreview(projectId, files, projectDir);
+    ? startDevelopmentPreview(projectId, files, projectDir, options)
+    : startProductionPreview(projectId, files, projectDir, options);
 };
 
 const stopPreview = async (projectId) => {
@@ -566,7 +621,25 @@ const getStatus = (projectId) => {
     mode: preview.mode || DEFAULT_PREVIEW_MODE,
     frontendUrl: preview.frontendUrl || null,
     backendUrl: preview.backendUrl || null,
+    startedAt: preview.startedAt || null,
+    lastAccessAt: preview.lastAccessAt || null,
+    currentRequests: Number(preview.currentRequests || 0),
   };
+};
+
+const listActivePreviews = () => {
+  return Array.from(activePreviews.entries()).map(([projectId, preview]) => ({
+    projectId,
+    status: preview.status,
+    step: preview.step,
+    mode: preview.mode || DEFAULT_PREVIEW_MODE,
+    frontendUrl: preview.frontendUrl || null,
+    backendUrl: preview.backendUrl || null,
+    startedAt: preview.startedAt || null,
+    lastAccessAt: preview.lastAccessAt || null,
+    currentRequests: Number(preview.currentRequests || 0),
+    runtimePolicy: preview.runtimePolicy || null,
+  }));
 };
 
 // Clean up all previews on process exit
@@ -583,4 +656,6 @@ export default {
   startPreview,
   stopPreview,
   getStatus,
+  touchPreview,
+  listActivePreviews,
 };

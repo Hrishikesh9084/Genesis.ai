@@ -11,15 +11,22 @@ function getUserInitial(user) {
   return user.name.trim().charAt(0).toUpperCase();
 }
 
-function UserAvatar({ user, sizeClass = "w-8 h-8" }) {
+function UserAvatar({ user, sizeClass = "md:w-11 md:h-11 cursor-pointer" }) {
   if (!user) return null;
+  const avatarUrl = user.avatar_url || user.avatarUrl || user.profile_image_url || null;
 
-  if (user.avatar_url) {
+  if (avatarUrl) {
     return (
       <img
-        src={user.avatar_url}
+        src={avatarUrl}
         alt={user.name || "Profile"}
-        className={`${sizeClass} rounded-full object-cover border border-gray-700/70`}
+        className={`${sizeClass} shrink-0 rounded-full border border-gray-700/70 object-cover`}
+        onError={(event) => {
+          event.currentTarget.onerror = null;
+          event.currentTarget.src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" rx="20" fill="#111827"/><text x="50%" y="56%" dominant-baseline="middle" text-anchor="middle" fill="#fdba74" font-family="Arial, sans-serif" font-size="18" font-weight="700">${getUserInitial(user)}</text></svg>`,
+          )}`;
+        }}
       />
     );
   }
@@ -60,6 +67,7 @@ export default function Navbar() {
 
   const authLinks = [
     { name: "Dashboard", href: "/dashboard" },
+    { name: "Domains", href: "/domains" },
     { name: "New Project", href: "/new-project" },
   ];
 
@@ -270,26 +278,24 @@ export default function Navbar() {
             ))
           )}
           {user ? (
-            <button
-              onClick={() => navigate("/settings")}
-              className="flex items-center gap-2 rounded-full border border-gray-700/70  hover:border-orange-500/50 transition-colors"
-              title={user.name || "Profile"}
-            >
+            <div className="flex items-center gap-2">
               <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  navigate("/plans");
-                }}
-                className="px-7 text-sm py-3.5 text-white rounded-full font-medium bg-transparent border border-orange-500 cursor-pointer"
+                type="button"
+                onClick={() => navigate("/plans")}
+                className="rounded-full border border-orange-500 bg-transparent px-7 py-2 text-sm font-medium text-white cursor-pointer"
                 title="Buy credits"
               >
                 {Number(user?.credits || 0)} credits
               </button>
-              <UserAvatar user={user} />
-              <span className="p-2  text-sm text-gray-300 max-w-24 truncate">
-                
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => navigate("/settings")}
+                className="rounded-full transition hover:scale-105 "
+                title={user.name || "Profile"}
+              >
+                <UserAvatar user={user}/>
+              </button>
+            </div>
           ) : (
             <Link
               to="/register"

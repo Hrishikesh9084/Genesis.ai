@@ -1,0 +1,120 @@
+🚀 STEP 1: AWS pe server banana (VPS)
+
+👉 Open: AWS
+Login karo
+
+Steps:
+Search: EC2
+Click: Launch Instance
+Fill karo:
+Name: genesis-server
+OS: Ubuntu
+Instance: t2.micro (FREE)
+🔑 STEP 2: Key create (MOST IMPORTANT)
+
+👉 "Create key pair" pe click karo
+
+Name: genesis-key
+Download .pem file
+
+👉 File download hogi:
+
+genesis-key.pem
+
+💡 Ye hi:
+👉 Private Key (isse login karoge)
+
+🌐 STEP 3: Server IP milega
+
+Instance create hone ke baad:
+
+👉 EC2 dashboard me dikhega:
+
+Public IP: 3.110.xxx.xxx
+
+👉 Ye hi:
+👉 VPS HOST/IP
+
+👤 STEP 4: Login karo server me
+
+Apne PC me terminal kholo:
+
+chmod 400 genesis-key.pem
+
+ssh -i genesis-key.pem ubuntu@3.110.xxx.xxx
+
+👉 Ho gaya login 🎉
+
+🌍 STEP 5: Domain lena (VERY EASY)
+
+👉 Buy from:
+
+Namecheap
+
+Example:
+
+genesis.app
+🌐 STEP 6: Domain ko server se connect karo
+
+Domain dashboard me jao → DNS settings
+
+Add karo:
+
+Type: A
+Name: app
+Value: 3.110.xxx.xxx
+
+Type: A
+Name: api
+Value: 3.110.xxx.xxx
+
+👉 Result:
+
+app.genesis.app
+api.genesis.app
+⚙️ STEP 7: Ye ENV values fill karo
+DOCKER_CLOUD_DEPLOY_DOMAIN=app.genesis.app
+DOCKER_CLOUD_API_DOMAIN=api.genesis.app
+DOCKER_CLOUD_SSL_EMAIL=hrishi@genesis.app
+
+👉 Ye tum manually likhte ho
+
+🔒 STEP 8: HTTPS (SSL enable)
+
+Server me run karo:
+
+sudo apt update
+sudo apt install nginx certbot python3-certbot-nginx -y
+
+sudo certbot --nginx -d app.genesis.app -d api.genesis.app
+
+👉 Ab site HTTPS ho jayegi 🔥
+
+🧠 FINAL SAMJH (1 line me)
+
+👉 AWS deta hai:
+
+Server (IP)
+
+👉 Tum karte ho:
+
+Key create
+Domain connect
+SSL enable
+⚡ VISUAL FLOW
+Laptop → SSH Key → AWS Server (IP)
+↓
+Domain (app/api)
+↓
+HTTPS (SSL)
+🔥 TERE LIYE NEXT STEP
+
+Agar tu Genesis.ai bana raha hai:
+
+👉 bol: “Auto deploy system banana hai”
+
+Main tujhe sikhaunga:
+
+GitHub se auto deploy
+user ko live URL dena
+Render jaisa system 🚀

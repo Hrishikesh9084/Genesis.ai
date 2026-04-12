@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Code, Edit3, Rocket, Trash2, RefreshCw, Download, Loader2, X } from 'lucide-react';
+import { Code, Edit3, Rocket, Trash2, RefreshCw, Download, Loader2, X, Zap, Globe, ExternalLink } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import api from '../services/api';
@@ -19,6 +19,7 @@ export default function ProjectDetail() {
   const [files, setFiles] = useState({});
   const [saving, setSaving] = useState(false);
   const [activeView, setActiveView] = useState('code');
+  const [quickDeploying, setQuickDeploying] = useState(false);
 
   useEffect(() => {
     if (selectedFile && !files[selectedFile]) {
@@ -110,23 +111,51 @@ export default function ProjectDetail() {
     saveAs(blob, `${project.name.replace(/[^a-zA-Z0-9-_]/g, '-')}.zip`);
   };
 
+  const handleQuickDeploy = async () => {
+    setQuickDeploying(true);
+    try {
+      const res = await api.post('/deploy/deploy', { projectId: id });
+      const newDeployment = res.data.deployment;
+      toast.success('Deployment started! Check the Deploy page for live logs.');
+      setProject((prev) => ({ 
+        ...prev, 
+        deploy_url: newDeployment.url, 
+        deploy_platform: newDeployment.platform, 
+        status: 'deploying' 
+      }));
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to deploy');
+    } finally {
+      setQuickDeploying(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner text="Loading project..." />;
 
   if (!project) return null;
 
   if (project.status === 'generating') {
     const filePaths = Object.keys(files);
-    const generationSummary = filePaths.length > 0
-      ? `Previewing ${filePaths.length} seeded file${filePaths.length === 1 ? '' : 's'} while the AI finishes the final build.`
-      : 'Seeding the project preview workspace...';
+    const hasFiles = filePaths.length > 0;
+
+    // Determine which generation step we're on based on file count
+    const genSteps = [
+      { label: 'Analyzing Prompt', icon: '🧠', threshold: 0 },
+      { label: 'Scaffolding Project', icon: '📐', threshold: 1 },
+      { label: 'Building Backend', icon: '⚙️', threshold: 3 },
+      { label: 'Building Frontend', icon: '🎨', threshold: 8 },
+      { label: 'Polishing & Testing', icon: '✨', threshold: 15 },
+    ];
+    const currentStep = genSteps.reduce((acc, step, i) => filePaths.length >= step.threshold ? i : acc, 0);
 
     return (
       <div className="h-[calc(100vh-128px)] flex flex-col min-h-0">
+        {/* Top Bar */}
         <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
           <div className="flex items-center gap-4 min-w-0">
             <div className="min-w-0">
               <h1 className="text-lg font-semibold truncate max-w-50">{project.name}</h1>
-              <p className="text-xs text-gray-500 mt-0.5">Generating your project in a live production workspace</p>
+              <p className="text-xs text-gray-500 mt-0.5">AI is generating your production application</p>
             </div>
             <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-300 border border-orange-500/20">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -143,44 +172,167 @@ export default function ProjectDetail() {
         </div>
 
         <div className="flex-1 min-h-0 overflow-hidden bg-gray-950">
-          <div className="grid h-full gap-4 p-4 xl:grid-cols-[280px_minmax(0,1.1fr)_minmax(0,1fr)]">
-            <div
-              data-lenis-prevent
-              className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-800 bg-gray-900/70"
-            >
-              <div className="border-b border-gray-800 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Live files</p>
-                    <p className="text-sm text-gray-300 mt-1">{filePaths.length} file{filePaths.length === 1 ? '' : 's'} visible</p>
+          {hasFiles ? (
+            /* Show file tree + code editor + preview when files start appearing */
+            <div className="grid h-full gap-4 p-4 xl:grid-cols-[280px_minmax(0,1.1fr)_minmax(0,1fr)]">
+              <div
+                data-lenis-prevent
+                className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-gray-800 bg-gray-900/70"
+              >
+                <div className="border-b border-gray-800 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Live files</p>
+                      <p className="text-sm text-gray-300 mt-1">{filePaths.length} file{filePaths.length === 1 ? '' : 's'} generated</p>
+                    </div>
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 animate-pulse">● Live</span>
                   </div>
-                  <span className="text-[11px] px-2 py-1 rounded-full bg-gray-800 text-gray-400">Read only</span>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">{generationSummary}</p>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
-              </div>
-            </div>
-
-            <div className="min-h-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
-              {selectedFile ? (
-                <CodeEditor
-                  filePath={selectedFile}
-                  content={files[selectedFile] || ''}
-                  readOnly
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-gray-500">
-                  Waiting for the first generated file...
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div className="min-h-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
-              <PreviewPane projectId={id} files={files} liveReload />
+              <div className="min-h-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
+                {selectedFile ? (
+                  <CodeEditor
+                    filePath={selectedFile}
+                    content={files[selectedFile] || ''}
+                    readOnly
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-gray-500">
+                    Select a file to preview generated code
+                  </div>
+                )}
+              </div>
+
+              <div className="min-h-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
+                <PreviewPane projectId={id} files={files} liveReload />
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Premium animated generation screen when no files yet */
+            <div className="flex items-center justify-center h-full relative overflow-hidden">
+              {/* Animated Background Glow */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-[600px] h-[600px] rounded-full bg-gradient-to-br from-orange-500/5 via-purple-500/5 to-cyan-500/5 blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-[400px] h-[400px] rounded-full bg-gradient-to-tr from-orange-400/8 to-indigo-500/8 blur-2xl" style={{ animation: 'spin 20s linear infinite' }} />
+              </div>
+
+              <div className="relative z-10 text-center max-w-lg px-6">
+                {/* Orbital Animation */}
+                <div className="relative w-32 h-32 mx-auto mb-8">
+                  {/* Center icon */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-orange-500/30">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                  </div>
+                  {/* Orbit ring 1 */}
+                  <div className="absolute inset-0" style={{ animation: 'spin 3s linear infinite' }}>
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1">
+                      <div className="w-3 h-3 bg-cyan-400 rounded-full shadow-lg shadow-cyan-400/50" />
+                    </div>
+                  </div>
+                  {/* Orbit ring 2 */}
+                  <div className="absolute inset-[-8px]" style={{ animation: 'spin 5s linear infinite reverse' }}>
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1">
+                      <div className="w-2.5 h-2.5 bg-purple-400 rounded-full shadow-lg shadow-purple-400/50" />
+                    </div>
+                  </div>
+                  {/* Orbit ring 3 */}
+                  <div className="absolute inset-[-16px]" style={{ animation: 'spin 7s linear infinite' }}>
+                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50" />
+                    </div>
+                  </div>
+                  {/* Orbit rings (visual) */}
+                  <div className="absolute inset-0 rounded-full border border-dashed border-gray-700/30" />
+                  <div className="absolute inset-[-8px] rounded-full border border-dashed border-gray-700/20" />
+                  <div className="absolute inset-[-16px] rounded-full border border-dashed border-gray-700/15" />
+                </div>
+
+                {/* Title */}
+                <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-orange-300 via-white to-purple-300 bg-clip-text text-transparent">
+                  Generating Your Application
+                </h2>
+                <p className="text-gray-400 text-sm mb-8">
+                  The AI is architecting, coding, and assembling your full-stack production app
+                </p>
+
+                {/* Progress Steps */}
+                <div className="flex items-center justify-center gap-1 mb-8">
+                  {genSteps.map((step, i) => (
+                    <div key={step.label} className="flex items-center">
+                      <div className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-500 ${
+                        i < currentStep ? 'bg-green-900/30 text-green-400 border border-green-800/50' :
+                        i === currentStep ? 'bg-orange-900/40 text-orange-300 border border-orange-700/50 shadow-lg shadow-orange-500/20' :
+                        'bg-gray-800/40 text-gray-600 border border-gray-700/30'
+                      }`}>
+                        {i < currentStep ? (
+                          <span>✓</span>
+                        ) : i === currentStep ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <span className="text-xs">{step.icon}</span>
+                        )}
+                        <span className="hidden sm:inline">{step.label}</span>
+                      </div>
+                      {i < genSteps.length - 1 && (
+                        <div className={`w-4 h-px mx-0.5 ${i < currentStep ? 'bg-green-700' : 'bg-gray-700'}`} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Simulated Code Lines Animation */}
+                <div className="bg-[#0a0e14] border border-gray-800 rounded-xl p-4 text-left overflow-hidden max-w-md mx-auto">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <div className="flex space-x-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
+                    </div>
+                    <span className="text-[10px] text-gray-600 font-mono">genesis-ai generating...</span>
+                  </div>
+                  <div className="space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center text-purple-400" style={{ animation: 'fadeInUp 0.5s ease-out', animationFillMode: 'both', animationDelay: '0s' }}>
+                      <span className="text-gray-700 w-5 text-right mr-2">1</span>
+                      <span className="text-blue-400">import</span><span className="text-gray-300"> {'{ '}Express{' }'} </span><span className="text-blue-400">from</span><span className="text-green-400"> 'express'</span>
+                    </div>
+                    <div className="flex items-center" style={{ animation: 'fadeInUp 0.5s ease-out', animationFillMode: 'both', animationDelay: '0.3s' }}>
+                      <span className="text-gray-700 w-5 text-right mr-2">2</span>
+                      <span className="text-blue-400">import</span><span className="text-gray-300"> {'{ '}Router{' }'} </span><span className="text-blue-400">from</span><span className="text-green-400"> './routes'</span>
+                    </div>
+                    <div className="flex items-center" style={{ animation: 'fadeInUp 0.5s ease-out', animationFillMode: 'both', animationDelay: '0.6s' }}>
+                      <span className="text-gray-700 w-5 text-right mr-2">3</span>
+                      <span className="text-gray-600">// Setting up production server</span>
+                    </div>
+                    <div className="flex items-center" style={{ animation: 'fadeInUp 0.5s ease-out', animationFillMode: 'both', animationDelay: '0.9s' }}>
+                      <span className="text-gray-700 w-5 text-right mr-2">4</span>
+                      <span className="text-purple-400">const</span><span className="text-cyan-300"> app</span><span className="text-gray-300"> = </span><span className="text-yellow-300">Express</span><span className="text-gray-300">()</span>
+                    </div>
+                    <div className="flex items-center" style={{ animation: 'fadeInUp 0.5s ease-out', animationFillMode: 'both', animationDelay: '1.2s' }}>
+                      <span className="text-gray-700 w-5 text-right mr-2">5</span>
+                      <span className="text-cyan-300">app</span><span className="text-gray-300">.</span><span className="text-yellow-300">use</span><span className="text-gray-300">(</span><span className="text-yellow-300">Router</span><span className="text-gray-300">)</span>
+                    </div>
+                    <div className="flex items-center" style={{ animation: 'fadeInUp 0.5s ease-out', animationFillMode: 'both', animationDelay: '1.5s' }}>
+                      <span className="text-gray-700 w-5 text-right mr-2">6</span>
+                      <span className="w-2 h-3.5 bg-orange-400 animate-pulse rounded-sm" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tips */}
+                <p className="text-[11px] text-gray-600 mt-6">
+                  ⏱ Generation typically takes 30-90 seconds depending on complexity
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -253,6 +405,20 @@ export default function ProjectDetail() {
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Live URL indicator */}
+          {project.deploy_url && (
+            <a
+              href={project.deploy_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-1.5 text-xs bg-green-900/30 text-green-400 px-3 py-1.5 rounded-lg border border-green-800/50 hover:border-green-600/50 transition-colors"
+            >
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <Globe className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline font-mono">Live</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
           <button onClick={handleSave} disabled={saving} className="btn-secondary text-sm py-1.5 px-3 flex items-center space-x-1">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Save</span>}
           </button>
@@ -260,6 +426,16 @@ export default function ProjectDetail() {
             <Edit3 className="w-4 h-4" />
             <span className="hidden md:inline">AI Edit</span>
           </Link>
+          {/* Quick Deploy */}
+          <button
+            onClick={handleQuickDeploy}
+            disabled={quickDeploying}
+            className="text-sm py-1.5 px-3 flex items-center space-x-1.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-emerald-900/30"
+            title="Quick deploy to Genesis"
+          >
+            {quickDeploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            <span className="hidden md:inline">{quickDeploying ? 'Deploying...' : 'Quick Deploy'}</span>
+          </button>
           <Link to={`/project/${id}/deploy`} className="btn-primary text-sm py-1.5 px-3 flex items-center space-x-1.5">
             <Rocket className="w-4 h-4" />
             <span className="hidden md:inline">Deploy</span>

@@ -73,11 +73,26 @@ ADD COLUMN IF NOT EXISTS deploy_backend_url TEXT;
 CREATE TABLE IF NOT EXISTS deployments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
   platform VARCHAR(50) NOT NULL,
   status VARCHAR(50) DEFAULT 'pending',
+  subdomain VARCHAR(63),
   url TEXT,
   deploy_id TEXT,
+  runtime_type VARCHAR(30),
+  runtime_id TEXT,
+  runtime_port INTEGER,
   logs TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS deployment_domains (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE UNIQUE,
+  subdomain VARCHAR(63) NOT NULL UNIQUE,
+  deployment_url TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -146,6 +161,10 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
 
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_deployments_project_id ON deployments(project_id);
+CREATE INDEX IF NOT EXISTS idx_deployments_user_id ON deployments(user_id);
+CREATE INDEX IF NOT EXISTS idx_deployments_runtime_id ON deployments(runtime_id);
+CREATE INDEX IF NOT EXISTS idx_deployment_domains_user_id ON deployment_domains(user_id);
+CREATE INDEX IF NOT EXISTS idx_deployment_domains_project_id ON deployment_domains(project_id);
 CREATE INDEX IF NOT EXISTS idx_job_applications_email ON job_applications(email);
 CREATE INDEX IF NOT EXISTS idx_job_applications_role_id ON job_applications(role_id);
 CREATE INDEX IF NOT EXISTS idx_job_applications_status ON job_applications(status);

@@ -15,6 +15,7 @@ APPLICATION_WORKFLOW.md
 PRIVICY_POLICY.md
 TERMS_OF_SERVICE.md
 PRIVACY_POLICY.md
+.npm-cache
 uploads/
 dist/
 build/

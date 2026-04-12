@@ -193,17 +193,41 @@ function validateUpdateProfile(req, res, next) {
 }
 
 function validateDeployBody(req, res, next) {
-  const { target } = req.body || {};
+  const { platform } = req.body || {};
 
-  if (target !== undefined && !['frontend', 'backend', 'fullstack'].includes(target)) {
-    return badRequest(res, 'target must be "frontend", "backend", or "fullstack".');
+  if (platform === undefined || platform === null || platform === '') {
+    req.body.platform = 'genesis-managed';
+    return next();
   }
 
+  if (typeof platform !== 'string') {
+    return badRequest(res, 'platform must be a string.');
+  }
+
+  const normalized = platform.trim().toLowerCase();
+  if (!['genesis-managed', 'vercel', 'render', 'docker-cloud'].includes(normalized)) {
+    return badRequest(res, 'Platform must be "genesis-managed", "vercel", "render", or "docker-cloud".');
+  }
+
+  req.body.platform = normalized;
   next();
 }
 
 function validateDeploymentKeys(req, res, next) {
-  const { vercel_token, render_api_key, render_owner_id } = req.body || {};
+  const {
+    vercel_token,
+    render_api_key,
+    render_owner_id,
+    docker_cloud_vps_host,
+    docker_cloud_vps_user,
+    docker_cloud_vps_port,
+    docker_cloud_vps_ssh_private_key,
+    docker_cloud_domain,
+    docker_cloud_api_domain,
+    docker_cloud_ssl_email,
+    docker_cloud_provider,
+    docker_cloud_enable_kubernetes,
+  } = req.body || {};
 
   if (vercel_token !== undefined && typeof vercel_token !== 'string') {
     return badRequest(res, 'vercel_token must be a string.');
@@ -215,6 +239,97 @@ function validateDeploymentKeys(req, res, next) {
 
   if (render_owner_id !== undefined && typeof render_owner_id !== 'string') {
     return badRequest(res, 'render_owner_id must be a string.');
+  }
+
+  if (docker_cloud_vps_host !== undefined && typeof docker_cloud_vps_host !== 'string') {
+    return badRequest(res, 'docker_cloud_vps_host must be a string.');
+  }
+
+  if (docker_cloud_vps_user !== undefined && typeof docker_cloud_vps_user !== 'string') {
+    return badRequest(res, 'docker_cloud_vps_user must be a string.');
+  }
+
+  if (docker_cloud_vps_port !== undefined) {
+    const parsedPort = Number.parseInt(String(docker_cloud_vps_port), 10);
+    if (!Number.isFinite(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
+      return badRequest(res, 'docker_cloud_vps_port must be a valid port number.');
+    }
+  }
+
+  if (
+    docker_cloud_vps_ssh_private_key !== undefined &&
+    typeof docker_cloud_vps_ssh_private_key !== 'string'
+  ) {
+    return badRequest(res, 'docker_cloud_vps_ssh_private_key must be a string.');
+  }
+
+  if (docker_cloud_domain !== undefined && typeof docker_cloud_domain !== 'string') {
+    return badRequest(res, 'docker_cloud_domain must be a string.');
+  }
+
+  if (docker_cloud_api_domain !== undefined && typeof docker_cloud_api_domain !== 'string') {
+    return badRequest(res, 'docker_cloud_api_domain must be a string.');
+  }
+
+  if (docker_cloud_ssl_email !== undefined && !isValidEmail(docker_cloud_ssl_email)) {
+    return badRequest(res, 'docker_cloud_ssl_email must be a valid email.');
+  }
+
+  if (docker_cloud_provider !== undefined) {
+    const provider = String(docker_cloud_provider).trim().toLowerCase();
+    if (!['aws', 'digitalocean', 'vps', ''].includes(provider)) {
+      return badRequest(res, 'docker_cloud_provider must be one of: aws, digitalocean, vps.');
+    }
+  }
+
+  if (
+    docker_cloud_enable_kubernetes !== undefined &&
+    typeof docker_cloud_enable_kubernetes !== 'boolean'
+  ) {
+    return badRequest(res, 'docker_cloud_enable_kubernetes must be a boolean.');
+  }
+
+  next();
+}
+
+function validateOneClickDeployBody(req, res, next) {
+  const { projectName, code, maxAttempts, subdomain, env } = req.body || {};
+
+  if (!String(projectName || '').trim()) {
+    return badRequest(res, 'projectName is required.');
+  }
+
+  if (!code || typeof code !== 'object') {
+    return badRequest(res, 'code must be an object containing frontend and backend files.');
+  }
+
+  const frontend = code.frontendFiles || code.frontend;
+  const backend = code.backendFiles || code.backend;
+
+  if (!frontend || typeof frontend !== 'object') {
+    return badRequest(res, 'code.frontendFiles (or code.frontend) must be an object or array of files.');
+  }
+
+  if (!backend || typeof backend !== 'object') {
+    return badRequest(res, 'code.backendFiles (or code.backend) must be an object or array of files.');
+  }
+
+  if (maxAttempts !== undefined) {
+    const parsed = Number.parseInt(String(maxAttempts), 10);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 3) {
+      return badRequest(res, 'maxAttempts must be an integer between 1 and 3.');
+    }
+  }
+
+  if (subdomain !== undefined) {
+    const value = String(subdomain).trim().toLowerCase();
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)) {
+      return badRequest(res, 'subdomain must be lowercase, URL-safe, and hyphenated only.');
+    }
+  }
+
+  if (env !== undefined && (typeof env !== 'object' || Array.isArray(env))) {
+    return badRequest(res, 'env must be an object when provided.');
   }
 
   next();
@@ -625,6 +740,7 @@ export default {
   validateGithubPush,
   validateUpdateProfile,
   validateDeployBody,
+  validateOneClickDeployBody,
   validateDeploymentKeys,
   validateDeployIdParam,
   validateNewsletterSubscription,
