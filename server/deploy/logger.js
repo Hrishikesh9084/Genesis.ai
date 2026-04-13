@@ -1,11 +1,41 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 
-const LOG_DIR = path.resolve(process.cwd(), 'uploads', 'deploy-logs');
+const PRIMARY_LOG_DIR = path.resolve(process.cwd(), 'uploads', 'deploy-logs');
+const FALLBACK_LOG_DIR = path.join(os.tmpdir(), 'genesis-ai', 'uploads', 'deploy-logs');
+
+let resolvedLogDirPromise = null;
+
+async function resolveLogDir() {
+  if (!resolvedLogDirPromise) {
+    resolvedLogDirPromise = (async () => {
+      const preferredDirs = [
+        process.env.GENESIS_DEPLOY_LOG_DIR,
+        PRIMARY_LOG_DIR,
+        FALLBACK_LOG_DIR,
+      ].filter(Boolean);
+
+      let lastError = null;
+      for (const candidate of preferredDirs) {
+        try {
+          await fs.mkdir(candidate, { recursive: true });
+          return candidate;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error('Unable to create a writable deployment log directory.');
+    })();
+  }
+
+  return resolvedLogDirPromise;
+}
 
 async function ensureLogDir() {
-  await fs.mkdir(LOG_DIR, { recursive: true });
+  return resolveLogDir();
 }
 
 function toLine(entry) {
@@ -39,10 +69,9 @@ export function createDeploymentLogger(projectName) {
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 40) || 'app';
-
-  const logFilePath = path.join(LOG_DIR, `${safeName}-${deploymentId}.log`);
   const inMemory = [];
   const listeners = new Set();
+  let logFilePath = path.join(PRIMARY_LOG_DIR, `${safeName}-${deploymentId}.log`);
 
   async function write(level, message, metadata = {}) {
     const entry = {
@@ -60,13 +89,18 @@ export function createDeploymentLogger(projectName) {
         // Ignore listener callback errors.
       }
     }
-    await ensureLogDir();
+    const logDir = await ensureLogDir();
+    if (path.dirname(logFilePath) !== logDir) {
+      logFilePath = path.join(logDir, `${safeName}-${deploymentId}.log`);
+    }
     await fs.appendFile(logFilePath, toLine(entry), 'utf8');
   }
 
   return {
     deploymentId,
-    logFilePath,
+    get logFilePath() {
+      return logFilePath;
+    },
     async info(message, metadata = {}) {
       await write('info', message, metadata);
     },
