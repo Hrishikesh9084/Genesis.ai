@@ -6,6 +6,7 @@ import os from 'node:os';
 const PRIMARY_STORE_DIR = path.resolve(process.cwd(), 'uploads', 'deployments');
 const FALLBACK_STORE_DIR = path.join(os.tmpdir(), 'genesis-ai', 'uploads', 'deployments');
 const STORE_PATH = path.join(PRIMARY_STORE_DIR, 'subdomain-port-map.json');
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
 const DEFAULT_START_PORT = Number.parseInt(String(process.env.GENESIS_DEPLOY_START_PORT || '3001'), 10);
 const DEFAULT_END_PORT = Number.parseInt(String(process.env.GENESIS_DEPLOY_END_PORT || '3999'), 10);
 let storePathsPromise = null;
@@ -15,8 +16,7 @@ async function resolveStorePaths() {
     storePathsPromise = (async () => {
       const candidates = [
         process.env.GENESIS_DEPLOY_STORE_DIR,
-        PRIMARY_STORE_DIR,
-        FALLBACK_STORE_DIR,
+        ...(IS_SERVERLESS ? [FALLBACK_STORE_DIR, PRIMARY_STORE_DIR] : [PRIMARY_STORE_DIR, FALLBACK_STORE_DIR]),
       ].filter(Boolean);
 
       let lastError = null;

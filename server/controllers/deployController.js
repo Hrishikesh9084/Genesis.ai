@@ -215,7 +215,14 @@ async function runManagedDeploymentAsync({ deploymentId, project, userId, subdom
       runtimeId: deployment.runtimeId,
     });
   } catch (err) {
-    await logger?.error?.('Managed deployment failed.', { error: err.message, deploymentId, projectId: project.id });
+    await logger?.error?.('Managed deployment failed.', {
+      error: err.message,
+      code: err?.code,
+      path: err?.path,
+      stack: err?.stack,
+      deploymentId,
+      projectId: project.id,
+    });
 
     try {
       await db.query(
@@ -542,7 +549,12 @@ const deployManaged = async (req, res, next) => {
       subdomain: domain.subdomain,
     });
   } catch (err) {
-    await logger.error('Managed deployment failed.', { error: err.message });
+    await logger.error('Managed deployment failed.', {
+      error: err.message,
+      code: err?.code,
+      path: err?.path,
+      stack: err?.stack,
+    });
     return next(err);
   }
 };

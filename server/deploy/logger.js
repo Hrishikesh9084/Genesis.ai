@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 
 const PRIMARY_LOG_DIR = path.resolve(process.cwd(), 'uploads', 'deploy-logs');
 const FALLBACK_LOG_DIR = path.join(os.tmpdir(), 'genesis-ai', 'uploads', 'deploy-logs');
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
 
 let resolvedLogDirPromise = null;
 
@@ -13,8 +14,7 @@ async function resolveLogDir() {
     resolvedLogDirPromise = (async () => {
       const preferredDirs = [
         process.env.GENESIS_DEPLOY_LOG_DIR,
-        PRIMARY_LOG_DIR,
-        FALLBACK_LOG_DIR,
+        ...(IS_SERVERLESS ? [FALLBACK_LOG_DIR, PRIMARY_LOG_DIR] : [PRIMARY_LOG_DIR, FALLBACK_LOG_DIR]),
       ].filter(Boolean);
 
       let lastError = null;

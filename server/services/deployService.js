@@ -13,6 +13,7 @@ const PM2_CONNECT_ASYNC = promisify(pm2.connect.bind(pm2));
 const PM2_DISCONNECT_ASYNC = promisify(pm2.disconnect.bind(pm2));
 const PRIMARY_MANAGED_APPS_DIR = path.resolve(process.cwd(), 'uploads', 'managed-apps');
 const FALLBACK_MANAGED_APPS_DIR = path.join(os.tmpdir(), 'genesis-ai', 'uploads', 'managed-apps');
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NETLIFY);
 const managedDeployments = new Map();
 const MANAGED_RUNTIME = String(process.env.GENESIS_MANAGED_RUNTIME || 'pm2').toLowerCase();
 let managedAppsDirPromise = null;
@@ -22,8 +23,9 @@ async function getManagedAppsDir() {
     managedAppsDirPromise = (async () => {
       const candidates = [
         process.env.GENESIS_MANAGED_APPS_DIR,
-        PRIMARY_MANAGED_APPS_DIR,
-        FALLBACK_MANAGED_APPS_DIR,
+        ...(IS_SERVERLESS
+          ? [FALLBACK_MANAGED_APPS_DIR, PRIMARY_MANAGED_APPS_DIR]
+          : [PRIMARY_MANAGED_APPS_DIR, FALLBACK_MANAGED_APPS_DIR]),
       ].filter(Boolean);
 
       let lastError = null;
