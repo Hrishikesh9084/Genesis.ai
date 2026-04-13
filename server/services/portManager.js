@@ -1,11 +1,43 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import net from 'node:net';
+import os from 'node:os';
 
-const STORE_DIR = path.resolve(process.cwd(), 'uploads', 'deployments');
-const STORE_PATH = path.join(STORE_DIR, 'subdomain-port-map.json');
+const PRIMARY_STORE_DIR = path.resolve(process.cwd(), 'uploads', 'deployments');
+const FALLBACK_STORE_DIR = path.join(os.tmpdir(), 'genesis-ai', 'uploads', 'deployments');
+const STORE_PATH = path.join(PRIMARY_STORE_DIR, 'subdomain-port-map.json');
 const DEFAULT_START_PORT = Number.parseInt(String(process.env.GENESIS_DEPLOY_START_PORT || '3001'), 10);
 const DEFAULT_END_PORT = Number.parseInt(String(process.env.GENESIS_DEPLOY_END_PORT || '3999'), 10);
+let storePathsPromise = null;
+
+async function resolveStorePaths() {
+  if (!storePathsPromise) {
+    storePathsPromise = (async () => {
+      const candidates = [
+        process.env.GENESIS_DEPLOY_STORE_DIR,
+        PRIMARY_STORE_DIR,
+        FALLBACK_STORE_DIR,
+      ].filter(Boolean);
+
+      let lastError = null;
+      for (const dir of candidates) {
+        try {
+          await fs.mkdir(dir, { recursive: true });
+          return {
+            dir,
+            file: path.join(dir, 'subdomain-port-map.json'),
+          };
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error('Unable to create deployment store directory.');
+    })();
+  }
+
+  return storePathsPromise;
+}
 
 function sanitizeSubdomain(value) {
   return String(value || '')
@@ -18,21 +50,22 @@ function sanitizeSubdomain(value) {
 }
 
 async function ensureStore() {
-  await fs.mkdir(STORE_DIR, { recursive: true });
+  const { file } = await resolveStorePaths();
   try {
-    await fs.access(STORE_PATH);
+    await fs.access(file);
   } catch {
     const initial = {
       updatedAt: new Date().toISOString(),
       mappings: {},
     };
-    await fs.writeFile(STORE_PATH, JSON.stringify(initial, null, 2), 'utf8');
+    await fs.writeFile(file, JSON.stringify(initial, null, 2), 'utf8');
   }
 }
 
 async function readStore() {
   await ensureStore();
-  const raw = await fs.readFile(STORE_PATH, 'utf8');
+  const { file } = await resolveStorePaths();
+  const raw = await fs.readFile(file, 'utf8');
   const parsed = JSON.parse(raw || '{}');
   return {
     updatedAt: parsed.updatedAt || new Date().toISOString(),
@@ -41,11 +74,12 @@ async function readStore() {
 }
 
 async function writeStore(store) {
+  const { file } = await resolveStorePaths();
   const payload = {
     updatedAt: new Date().toISOString(),
     mappings: store.mappings || {},
   };
-  await fs.writeFile(STORE_PATH, JSON.stringify(payload, null, 2), 'utf8');
+  await fs.writeFile(file, JSON.stringify(payload, null, 2), 'utf8');
   return payload;
 }
 

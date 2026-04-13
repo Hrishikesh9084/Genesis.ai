@@ -11,9 +11,37 @@ const DEFAULT_DEPLOY_DOMAIN = process.env.GENESIS_DEPLOY_BASE_DOMAIN || 'genesis
 const execFileAsync = promisify(execFile);
 const PM2_CONNECT_ASYNC = promisify(pm2.connect.bind(pm2));
 const PM2_DISCONNECT_ASYNC = promisify(pm2.disconnect.bind(pm2));
-const MANAGED_APPS_DIR = path.resolve(process.cwd(), 'uploads', 'managed-apps');
+const PRIMARY_MANAGED_APPS_DIR = path.resolve(process.cwd(), 'uploads', 'managed-apps');
+const FALLBACK_MANAGED_APPS_DIR = path.join(os.tmpdir(), 'genesis-ai', 'uploads', 'managed-apps');
 const managedDeployments = new Map();
 const MANAGED_RUNTIME = String(process.env.GENESIS_MANAGED_RUNTIME || 'pm2').toLowerCase();
+let managedAppsDirPromise = null;
+
+async function getManagedAppsDir() {
+  if (!managedAppsDirPromise) {
+    managedAppsDirPromise = (async () => {
+      const candidates = [
+        process.env.GENESIS_MANAGED_APPS_DIR,
+        PRIMARY_MANAGED_APPS_DIR,
+        FALLBACK_MANAGED_APPS_DIR,
+      ].filter(Boolean);
+
+      let lastError = null;
+      for (const candidate of candidates) {
+        try {
+          await fs.mkdir(candidate, { recursive: true });
+          return candidate;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      throw lastError || new Error('Unable to create managed app workspace directory.');
+    })();
+  }
+
+  return managedAppsDirPromise;
+}
 
 function isDockerManagedRuntime() {
   return MANAGED_RUNTIME === 'docker';
@@ -345,7 +373,8 @@ async function deployManagedProject({ project, subdomain, logger, userEnvVars })
     runtime: MANAGED_RUNTIME,
   });
 
-  const projectRoot = path.join(MANAGED_APPS_DIR, String(project.id));
+  const managedAppsDir = await getManagedAppsDir();
+  const projectRoot = path.join(managedAppsDir, String(project.id));
   const files = parseProjectFiles(project.files);
   if (!files || Object.keys(files).length === 0) {
     throw new Error('Project has no generated files to deploy.');
