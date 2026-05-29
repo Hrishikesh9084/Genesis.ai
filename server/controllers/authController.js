@@ -144,6 +144,16 @@ function isLocalhostHost(value) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
 }
 
+function getRequestHost(req) {
+  const forwardedHost = req?.headers?.['x-forwarded-host'];
+  const hostHeader = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost;
+  return hostHeader || req?.get?.('host') || '';
+}
+
+function isLocalRequest(req) {
+  return isLocalhostHost(getRequestHost(req));
+}
+
 function isProduction() {
   const nodeEnv = String(process.env.NODE_ENV || '').toLowerCase();
   return (
@@ -215,7 +225,7 @@ function sanitizeEnvUrl(req, urlValue, label) {
 
 function resolveGithubRedirectUri(req) {
   const envRedirectUri = sanitizeEnvUrl(req, process.env.GITHUB_REDIRECT_URI, 'GITHUB_REDIRECT_URI');
-  if (envRedirectUri) return envRedirectUri;
+  if (envRedirectUri && (!isLocalRequest(req) || isLocalhostUrl(envRedirectUri))) return envRedirectUri;
 
   const forwardedProto = req.headers['x-forwarded-proto'];
   const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req.protocol;
@@ -225,7 +235,7 @@ function resolveGithubRedirectUri(req) {
 
 function resolveGoogleRedirectUri(req) {
   const envRedirectUri = sanitizeEnvUrl(req, process.env.GOOGLE_REDIRECT_URI, 'GOOGLE_REDIRECT_URI');
-  if (envRedirectUri) return envRedirectUri;
+  if (envRedirectUri && (!isLocalRequest(req) || isLocalhostUrl(envRedirectUri))) return envRedirectUri;
 
   const forwardedProto = req.headers['x-forwarded-proto'];
   const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req.protocol;
@@ -245,7 +255,7 @@ function resolveApiBaseUrl(req) {
 
 function resolveClientBaseUrl(req) {
   const envClientUrl = sanitizeEnvUrl(req, process.env.CLIENT_URL, 'CLIENT_URL');
-  if (envClientUrl) return envClientUrl;
+  if (envClientUrl && (!isLocalRequest(req) || isLocalhostUrl(envClientUrl))) return envClientUrl;
 
   const originHeader = req.headers.origin;
   const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;

@@ -4,6 +4,10 @@ function getAuthMethod() {
   return String(process.env.SMTP_AUTH_METHOD || 'password').toLowerCase();
 }
 
+function getOAuthClientSecret() {
+  return process.env.SMTP_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || '';
+}
+
 function isEmailConfigured() {
   const authMethod = getAuthMethod();
 
@@ -11,7 +15,7 @@ function isEmailConfigured() {
     return Boolean(
       process.env.SMTP_USER &&
         process.env.SMTP_CLIENT_ID &&
-        process.env.SMTP_CLIENT_SECRET &&
+        getOAuthClientSecret() &&
         process.env.SMTP_REFRESH_TOKEN &&
         process.env.SMTP_FROM
     );
@@ -36,7 +40,7 @@ function createTransporter() {
         type: 'OAuth2',
         user: process.env.SMTP_USER,
         clientId: process.env.SMTP_CLIENT_ID,
-        clientSecret: process.env.SMTP_CLIENT_SECRET,
+        clientSecret: getOAuthClientSecret(),
         refreshToken: process.env.SMTP_REFRESH_TOKEN,
       },
     });

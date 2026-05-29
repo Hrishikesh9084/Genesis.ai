@@ -4,6 +4,21 @@ function badRequest(res, error) {
   return res.status(400).json({ error });
 }
 
+const ALLOWED_INTENT_MODES = new Set(['balanced', 'speed', 'quality', 'refactor', 'debug']);
+
+function validateIntentModeValue(intentMode) {
+  if (intentMode === undefined || intentMode === null || intentMode === '') {
+    return null;
+  }
+
+  const normalized = String(intentMode).trim().toLowerCase();
+  if (!ALLOWED_INTENT_MODES.has(normalized)) {
+    return 'intentMode must be one of: balanced, speed, quality, refactor, debug.';
+  }
+
+  return null;
+}
+
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
 }
@@ -106,7 +121,7 @@ function validateProjectIdParam(req, res, next) {
 }
 
 function validateCreateProject(req, res, next) {
-  const { name, prompt, stack, model } = req.body || {};
+  const { name, prompt, stack, model, intentMode, installNodeModules } = req.body || {};
 
   if (!String(name || '').trim()) {
     return badRequest(res, 'Project name is required.');
@@ -128,11 +143,20 @@ function validateCreateProject(req, res, next) {
     return badRequest(res, 'model must be a string.');
   }
 
+  const intentValidationError = validateIntentModeValue(intentMode);
+  if (intentValidationError) {
+    return badRequest(res, intentValidationError);
+  }
+
+  if (installNodeModules !== undefined && typeof installNodeModules !== 'boolean') {
+    return badRequest(res, 'installNodeModules must be a boolean.');
+  }
+
   next();
 }
 
 function validateEditProject(req, res, next) {
-  const { prompt, model } = req.body || {};
+  const { prompt, model, intentMode, installNodeModules } = req.body || {};
 
   if (!String(prompt || '').trim()) {
     return badRequest(res, 'Edit prompt is required.');
@@ -144,6 +168,40 @@ function validateEditProject(req, res, next) {
 
   if (model && typeof model !== 'string') {
     return badRequest(res, 'model must be a string.');
+  }
+
+  const intentValidationError = validateIntentModeValue(intentMode);
+  if (intentValidationError) {
+    return badRequest(res, intentValidationError);
+  }
+
+  if (installNodeModules !== undefined && typeof installNodeModules !== 'boolean') {
+    return badRequest(res, 'installNodeModules must be a boolean.');
+  }
+
+  next();
+}
+
+function validateExplainProject(req, res, next) {
+  const { question, model, intentMode } = req.body || {};
+
+  if (question !== undefined) {
+    if (typeof question !== 'string') {
+      return badRequest(res, 'question must be a string.');
+    }
+
+    if (question.trim().length > 1500) {
+      return badRequest(res, 'question must be 1500 characters or fewer.');
+    }
+  }
+
+  if (model !== undefined && typeof model !== 'string') {
+    return badRequest(res, 'model must be a string.');
+  }
+
+  const intentValidationError = validateIntentModeValue(intentMode);
+  if (intentValidationError) {
+    return badRequest(res, intentValidationError);
   }
 
   next();
@@ -736,6 +794,7 @@ export default {
   validateProjectIdParam,
   validateCreateProject,
   validateEditProject,
+  validateExplainProject,
   validateProjectFiles,
   validateGithubPush,
   validateUpdateProfile,

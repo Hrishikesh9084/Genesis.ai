@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Monitor, Smartphone, Tablet, RefreshCw, Square, Play, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, RefreshCw, Square, Play, Loader2, ExternalLink, AlertCircle, ChevronLeft, ChevronRight, Globe } from 'lucide-react';
 import api from '../services/api';
 
 const PRODUCTION_STEPS = [

@@ -8,6 +8,7 @@ import Background from "./components/Background";
 import ScrollToTop from "./components/ScrollToTop";
 import LoadingSpinner from "./components/LoadingSpinner";
 import HelpBot from "./components/HelpBot";
+import AppTour from "./components/AppTour";
 
 const Home = lazy(() => import("./pages/Home"));
 const Login = lazy(() => import("./pages/Login"));
@@ -66,7 +67,14 @@ function GuestRoute({ children }) {
 }
 
 export default function App() {
+  const { user, loading } = useAuth();
   const [showBootLoader, setShowBootLoader] = useState(true);
+  const [showTour, setShowTour] = useState(false);
+
+  const getTourStorageKey = (currentUser) => {
+    const identifier = currentUser?.id || currentUser?.email;
+    return identifier ? `genesis_tour_completed_${identifier}` : null;
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -75,6 +83,27 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (loading || !user) {
+      setShowTour(false);
+      return;
+    }
+
+    const storageKey = getTourStorageKey(user);
+    if (!storageKey) return;
+
+    const hasCompletedTour = localStorage.getItem(storageKey) === "1";
+    setShowTour(!hasCompletedTour);
+  }, [loading, user]);
+
+  const handleTourComplete = () => {
+    const storageKey = getTourStorageKey(user);
+    if (storageKey) {
+      localStorage.setItem(storageKey, "1");
+    }
+    setShowTour(false);
+  };
 
   if (showBootLoader) {
     return (
@@ -107,7 +136,7 @@ export default function App() {
           speed={0.8}
         />
       </div>
-      <main className="px-4">
+      <main className="px-4 select-none">
         <Suspense
           fallback={
             <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
@@ -117,7 +146,7 @@ export default function App() {
         >
           <Routes>
             {/* Public routes - redirect to dashboard if logged in */}
-            <Route path="/" element={<GuestRoute><Home /></GuestRoute>} />
+            <Route path="/" element={<Home />} />
             <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
             <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -158,6 +187,7 @@ export default function App() {
       </main>
       <Footer />
       <HelpBot />
+      <AppTour open={showTour} onComplete={handleTourComplete} />
     </>
   );
 }

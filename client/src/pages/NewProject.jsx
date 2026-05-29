@@ -17,6 +17,14 @@ const promptExamples = [
 
 const LOCKED_MODEL_ID = "gemini-2.5-pro";
 
+const intentOptions = [
+  { value: 'balanced', label: 'Balanced', desc: 'Good speed and quality' },
+  { value: 'speed', label: 'Speed', desc: 'Faster generation and simpler implementation' },
+  { value: 'quality', label: 'Quality', desc: 'Higher rigor and maintainability' },
+  { value: 'refactor', label: 'Refactor', desc: 'Cleaner structure and architecture' },
+  { value: 'debug', label: 'Debug', desc: 'Focus on correctness and robustness' },
+];
+
 function isModelAllowed(modelId) {
   return modelId === LOCKED_MODEL_ID || modelId.startsWith("mistral-");
 }
@@ -26,6 +34,7 @@ export default function NewProject() {
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
   const [stack, setStack] = useState("nextjs-express");
+  const [intentMode, setIntentMode] = useState('balanced');
   const [model, setModel] = useState("");
   const [providers, setProviders] = useState({});
   const [loading, setLoading] = useState(false);
@@ -143,7 +152,7 @@ export default function NewProject() {
 
     setLoading(true);
     try {
-      const res = await api.post("/projects", { name, prompt, stack, model });
+      const res = await api.post("/projects", { name, prompt, stack, model, intentMode });
       await refreshUser();
       toast.success("Project generation started!");
       navigate(`/project/${res.data.project.id}`);
@@ -202,6 +211,24 @@ export default function NewProject() {
                 Full PERN Stack (PostgreSQL + Express + React + Node)
               </option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">Intent Mode</label>
+            <select
+              value={intentMode}
+              onChange={(e) => setIntentMode(e.target.value)}
+              className="input-field"
+            >
+              {intentOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} - {option.desc}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1.5">
+              Intent mode influences how the AI prioritizes speed, quality, and architecture decisions.
+            </p>
           </div>
 
           <div>

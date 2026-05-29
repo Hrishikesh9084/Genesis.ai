@@ -19,6 +19,14 @@ const editExamples = [
 
 const LOCKED_MODEL_ID = 'gemini-2.5-pro';
 
+const intentOptions = [
+  { value: 'balanced', label: 'Balanced', desc: 'Good speed and quality' },
+  { value: 'speed', label: 'Speed', desc: 'Faster implementation' },
+  { value: 'quality', label: 'Quality', desc: 'Higher rigor and maintainability' },
+  { value: 'refactor', label: 'Refactor', desc: 'Cleaner architecture and readability' },
+  { value: 'debug', label: 'Debug', desc: 'Bug-fix and correctness first' },
+];
+
 function isModelAllowed(modelId) {
   return modelId === LOCKED_MODEL_ID || modelId.startsWith('mistral-');
 }
@@ -29,6 +37,7 @@ export default function EditProject() {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editPrompt, setEditPrompt] = useState('');
+  const [intentMode, setIntentMode] = useState('balanced');
   const [model, setModel] = useState('');
   const [providers, setProviders] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -95,6 +104,24 @@ export default function EditProject() {
       setProject(res.data.project);
       const existingModel = res.data.project.model;
       setModel(isModelAllowed(existingModel) ? existingModel : LOCKED_MODEL_ID);
+
+      try {
+        const parsedFiles = typeof res.data.project.files === 'string'
+          ? JSON.parse(res.data.project.files)
+          : res.data.project.files;
+        const memoryRaw = parsedFiles?.['.genesis/decision-memory.json'];
+        if (memoryRaw) {
+          const memory = typeof memoryRaw === 'string' ? JSON.parse(memoryRaw) : memoryRaw;
+          if (Array.isArray(memory) && memory.length > 0) {
+            const latestIntent = memory[memory.length - 1]?.intentMode;
+            if (intentOptions.some((item) => item.value === latestIntent)) {
+              setIntentMode(latestIntent);
+            }
+          }
+        }
+      } catch {
+        // Ignore malformed metadata and keep default intent mode.
+      }
     } catch (err) {
       toast.error('Failed to load project');
       navigate('/dashboard');
@@ -113,7 +140,7 @@ export default function EditProject() {
 
     setSubmitting(true);
     try {
-      await api.put(`/projects/${id}/edit`, { prompt: editPrompt, model });
+      await api.put(`/projects/${id}/edit`, { prompt: editPrompt, model, intentMode });
       toast.success('Edit started! AI is updating your project...');
       navigate(`/project/${id}`);
     } catch (err) {
@@ -169,6 +196,24 @@ export default function EditProject() {
           />
           <p className="text-xs text-gray-500 mt-1.5">
             The AI will modify your existing code and keep frontend-backend connections intact.
+          </p>
+        </div>
+
+        <div className="card">
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Intent Mode</label>
+          <select
+            value={intentMode}
+            onChange={(e) => setIntentMode(e.target.value)}
+            className="input-field"
+          >
+            {intentOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label} - {option.desc}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500 mt-1.5">
+            Intent mode guides how AI applies this edit to your existing codebase.
           </p>
         </div>
 

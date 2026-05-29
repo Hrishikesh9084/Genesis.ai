@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Copy, Check } from 'lucide-react';
+import Editor, { loader } from '@monaco-editor/react';
+
+loader.config({
+  paths: {
+    vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@latest/min/vs',
+  },
+});
 
 function getLanguage(filePath) {
   const ext = filePath.split('.').pop().toLowerCase();
@@ -26,12 +33,11 @@ export default function CodeEditor({ filePath, content, onChange, readOnly = fal
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleChange = (e) => {
-    setLocalContent(e.target.value);
-    onChange?.(e.target.value);
+  const handleChange = (value) => {
+    const nextValue = value ?? '';
+    setLocalContent(nextValue);
+    onChange?.(nextValue);
   };
-
-  const lines = (localContent || '').split('\n');
 
   return (
     <div data-lenis-prevent className="flex flex-col h-full min-h-0 bg-gray-950 rounded-lg overflow-hidden border border-gray-800 ">
@@ -45,18 +51,32 @@ export default function CodeEditor({ filePath, content, onChange, readOnly = fal
         </button>
       </div>
       <div data-lenis-prevent className="flex flex-1 min-h-0 overflow-hidden overscroll-contain">
-        <div className="flex flex-col items-end py-3 px-3 bg-gray-950 border-r border-gray-800 select-none ">
-          {lines.map((_, i) => (
-            <span key={i} className="text-xs text-gray-600 leading-6 font-mono">{i + 1}</span>
-          ))}
-        </div>
-        <textarea
-          value={localContent}
+        <Editor
+          height="100%"
+          width="100%"
+          language={getLanguage(filePath)}
+          value={localContent || ''}
+          theme="vs-dark"
           onChange={handleChange}
-          readOnly={readOnly}
-          spellCheck={false}
-          className="flex-1 min-h-0 p-3 bg-transparent text-sm font-mono text-gray-200 leading-6 resize-none focus:outline-none whitespace-pre overflow-y-auto overscroll-contain"
-          style={{ tabSize: 2 }}
+          loading={(
+            <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
+              Loading Monaco editor...
+            </div>
+          )}
+          options={{
+            readOnly,
+            minimap: { enabled: false },
+            fontSize: 13,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace',
+            lineHeight: 20,
+            smoothScrolling: true,
+            scrollBeyondLastLine: false,
+            wordWrap: 'off',
+            automaticLayout: true,
+            tabSize: 2,
+            renderWhitespace: 'selection',
+            padding: { top: 10 },
+          }}
         />
       </div>
     </div>

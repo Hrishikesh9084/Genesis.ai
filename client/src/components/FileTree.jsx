@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronRight, ChevronDown, FileCode, Folder, FolderOpen } from 'lucide-react';
 
 function buildTree(files) {
   const tree = {};
   Object.keys(files).forEach((path) => {
+    if (path.startsWith('.genesis/')) return;
     const parts = path.split('/');
     let current = tree;
     parts.forEach((part, i) => {
@@ -73,6 +74,7 @@ function TreeNode({ name, node, onSelect, selectedFile, depth = 0 }) {
 }
 
 export default function FileTree({ files, onSelect, selectedFile }) {
+  const scrollRef = useRef(null);
   const tree = buildTree(files);
   const entries = Object.entries(tree).sort(([, a], [, b]) => {
     const aIsFile = a.__isFile ? 1 : 0;
@@ -80,8 +82,31 @@ export default function FileTree({ files, onSelect, selectedFile }) {
     return aIsFile - bIsFile;
   });
 
+  const handleWheel = (event) => {
+    const node = scrollRef.current;
+    if (!node) return;
+
+    const canScroll = node.scrollHeight > node.clientHeight;
+    if (!canScroll) return;
+
+    const nextTop = node.scrollTop + event.deltaY;
+    const maxTop = node.scrollHeight - node.clientHeight;
+    const willScroll = nextTop >= 0 && nextTop <= maxTop;
+
+    if (willScroll) {
+      event.preventDefault();
+      event.stopPropagation();
+      node.scrollTop = nextTop;
+    }
+  };
+
   return (
-    <div data-lenis-prevent className="py-2 overflow-y-auto overscroll-contain">
+    <div
+      ref={scrollRef}
+      data-lenis-prevent
+      onWheel={handleWheel}
+      className="h-full min-h-0 py-2 overflow-y-auto overscroll-contain"
+    >
       {entries.map(([name, node]) => (
         <TreeNode
           key={name}

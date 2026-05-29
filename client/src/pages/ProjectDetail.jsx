@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Code, Edit3, Rocket, Trash2, RefreshCw, Download, Loader2, X, Zap, Globe, ExternalLink } from 'lucide-react';
+import { Code, Edit3, Rocket, Trash2, RefreshCw, Download, Loader2, X, Zap, Globe, ExternalLink, BrainCircuit } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import api from '../services/api';
@@ -9,6 +9,31 @@ import CodeEditor from '../components/CodeEditor';
 import PreviewPane from '../components/PreviewPane';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
+
+const DECISION_MEMORY_FILE = '.genesis/decision-memory.json';
+const INTENT_OPTIONS = [
+  { value: 'balanced', label: 'Balanced' },
+  { value: 'speed', label: 'Speed' },
+  { value: 'quality', label: 'Quality' },
+  { value: 'refactor', label: 'Refactor' },
+  { value: 'debug', label: 'Debug' },
+];
+
+function getVisibleFilePaths(files) {
+  return Object.keys(files || {}).filter((path) => !path.startsWith('.genesis/'));
+}
+
+function getLatestIntentFromFiles(files) {
+  try {
+    const raw = files?.[DECISION_MEMORY_FILE];
+    if (!raw) return 'balanced';
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed) || parsed.length === 0) return 'balanced';
+    return parsed[parsed.length - 1]?.intentMode || 'balanced';
+  } catch {
+    return 'balanced';
+  }
+}
 
 export default function ProjectDetail() {
   const { id } = useParams();
@@ -20,13 +45,25 @@ export default function ProjectDetail() {
   const [saving, setSaving] = useState(false);
   const [activeView, setActiveView] = useState('code');
   const [quickDeploying, setQuickDeploying] = useState(false);
+  const [explainOpen, setExplainOpen] = useState(false);
+  const [explainQuestion, setExplainQuestion] = useState('Explain the generated codebase architecture and main flows.');
+  const [explaining, setExplaining] = useState(false);
+  const [explanation, setExplanation] = useState(null);
+  const [intentMode, setIntentMode] = useState('balanced');
+  const [intentModeTouched, setIntentModeTouched] = useState(false);
 
   useEffect(() => {
     if (selectedFile && !files[selectedFile]) {
-      const firstFile = Object.keys(files)[0] || null;
+      const firstFile = getVisibleFilePaths(files)[0] || null;
       setSelectedFile(firstFile);
     }
   }, [files, selectedFile]);
+
+  useEffect(() => {
+    if (!intentModeTouched) {
+      setIntentMode(getLatestIntentFromFiles(files));
+    }
+  }, [files, intentModeTouched]);
 
   useEffect(() => {
     fetchProject();
@@ -53,7 +90,7 @@ export default function ProjectDetail() {
       if (parsedFiles && Object.keys(parsedFiles).length > 0) {
         setFiles(parsedFiles);
         if (!selectedFile) {
-          const firstFile = Object.keys(parsedFiles)[0];
+          const firstFile = getVisibleFilePaths(parsedFiles)[0];
           setSelectedFile(firstFile);
         }
       }
@@ -130,13 +167,30 @@ export default function ProjectDetail() {
     }
   };
 
+  const handleExplainCodebase = async () => {
+    setExplaining(true);
+    try {
+      const res = await api.post(`/projects/${id}/explain`, {
+        question: explainQuestion,
+        intentMode,
+      });
+      setExplanation(res.data.explanation);
+      setExplainOpen(true);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to explain codebase');
+    } finally {
+      setExplaining(false);
+    }
+  };
+
   if (loading) return <LoadingSpinner text="Loading project..." />;
 
   if (!project) return null;
 
   if (project.status === 'generating') {
-    const filePaths = Object.keys(files);
+    const filePaths = getVisibleFilePaths(files);
     const hasFiles = filePaths.length > 0;
+    const previewFile = selectedFile || filePaths[0] || null;
 
     // Determine which generation step we're on based on file count
     const genSteps = [
@@ -188,7 +242,7 @@ export default function ProjectDetail() {
                     <span className="text-[11px] px-2 py-1 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 animate-pulse">● Live</span>
                   </div>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
                 </div>
               </div>
@@ -198,7 +252,7 @@ export default function ProjectDetail() {
                   <CodeEditor
                     filePath={selectedFile}
                     content={files[selectedFile] || ''}
-                    readOnly
+                    onChange={handleFileChange}
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-gray-500">
@@ -208,7 +262,7 @@ export default function ProjectDetail() {
               </div>
 
               <div className="min-h-0 overflow-hidden rounded-xl border border-gray-800 bg-gray-950">
-                <PreviewPane projectId={id} files={files} liveReload />
+                <PreviewPane projectId={id} files={files} liveReload={true} />
               </div>
             </div>
           ) : (
@@ -374,7 +428,7 @@ export default function ProjectDetail() {
     );
   }
 
-  const fileCount = Object.keys(files).length;
+  const visibleFileCount = getVisibleFilePaths(files).length;
 
   return (
     <div className="h-[calc(100vh-128px)] flex flex-col min-h-0">
@@ -382,7 +436,7 @@ export default function ProjectDetail() {
       <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
         <div className="flex items-center space-x-4">
           <h1 className="text-lg font-semibold truncate max-w-50">{project.name}</h1>
-          <span className="text-xs text-gray-500">{fileCount} files</span>
+          <span className="text-xs text-gray-500">{visibleFileCount} files</span>
 
           <div className="flex items-center bg-gray-800 rounded-lg p-0.5">
             <button
@@ -393,18 +447,36 @@ export default function ProjectDetail() {
               <Code className="w-4 h-4" />
               <span>Code</span>
             </button>
-            <button
+            {/* <button
               type="button"
               onClick={() => setActiveView('preview')}
               className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${activeView === 'preview' ? 'bg-orange-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
               <Rocket className="w-4 h-4" />
               <span>Preview</span>
-            </button>
+            </button> */}
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
+          <div className="hidden lg:flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-2 py-1.5">
+            <span className="text-xs text-gray-400">Intent</span>
+            <select
+              value={intentMode}
+              onChange={(e) => {
+                setIntentMode(e.target.value);
+                setIntentModeTouched(true);
+              }}
+              className="bg-transparent text-sm text-gray-200 focus:outline-none"
+            >
+              {INTENT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value} className="bg-gray-900">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Live URL indicator */}
           {project.deploy_url && (
             <a
@@ -426,20 +498,38 @@ export default function ProjectDetail() {
             <Edit3 className="w-4 h-4" />
             <span className="hidden md:inline">AI Edit</span>
           </Link>
+          <button
+            onClick={handleExplainCodebase}
+            disabled={explaining || visibleFileCount === 0}
+            className="btn-secondary group text-sm py-1.5 px-3 flex items-center space-x-1.5 disabled:opacity-50 hover:-translate-y-0.5 hover:shadow-md hover:shadow-cyan-900/30 transition-all duration-200"
+            title="Explain generated codebase"
+          >
+            {explaining ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <BrainCircuit className="w-4 h-4 text-cyan-300 animate-pulse group-hover:animate-bounce" />
+            )}
+            <span className="hidden md:inline">Explain Codebase</span>
+          </button>
           {/* Quick Deploy */}
           <button
             onClick={handleQuickDeploy}
-            disabled={quickDeploying}
-            className="text-sm py-1.5 px-3 flex items-center space-x-1.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-lg transition-all disabled:opacity-50 shadow-lg shadow-emerald-900/30"
-            title="Quick deploy to Genesis"
+            disabled
+            className="text-sm py-1.5 px-3 flex items-center space-x-1.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-emerald-900/30"
+            title="Quick deploy is currently disabled"
           >
             {quickDeploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-            <span className="hidden md:inline">{quickDeploying ? 'Deploying...' : 'Quick Deploy'}</span>
+            <span className="hidden md:inline">Quick Deploy</span>
           </button>
-          <Link to={`/project/${id}/deploy`} className="btn-primary text-sm py-1.5 px-3 flex items-center space-x-1.5">
+          <button
+            type="button"
+            disabled
+            className="btn-primary text-sm py-1.5 px-3 flex items-center space-x-1.5 cursor-not-allowed disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Deploy is currently disabled"
+          >
             <Rocket className="w-4 h-4" />
             <span className="hidden md:inline">Deploy</span>
-          </Link>
+          </button>
           <button onClick={handleDownload} className="btn-secondary text-sm py-1.5 px-3">
             <Download className="w-4 h-4" />
           </button>
@@ -456,7 +546,7 @@ export default function ProjectDetail() {
             {/* File tree sidebar */}
             <div
               data-lenis-prevent
-              className="w-64 bg-gray-900 border-r border-gray-800 overflow-y-auto overscroll-contain shrink-0 min-h-0"
+                className="w-64 bg-gray-900 border-r border-gray-800 overflow-hidden shrink-0 min-h-0"
             >
               <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Files
@@ -471,7 +561,7 @@ export default function ProjectDetail() {
                   filePath={selectedFile}
                   content={files[selectedFile] || ''}
                   onChange={handleFileChange}
-                />
+                  />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   Select a file to view
@@ -480,11 +570,109 @@ export default function ProjectDetail() {
             </div>
           </>
         ) : (
-          <div className="flex-1 overflow-hidden min-h-0">
-            <PreviewPane projectId={id} files={files} />
+          <div className="flex-1 flex min-h-0 overflow-hidden">
+            <div
+              data-lenis-prevent
+                className="w-64 bg-gray-900 border-r border-gray-800 overflow-hidden shrink-0 min-h-0"
+            >
+              <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Files
+              </div>
+              <FileTree files={files} onSelect={setSelectedFile} selectedFile={selectedFile} />
+            </div>
+
+            <div className="flex-1 overflow-hidden min-h-0">
+              {selectedFile ? (
+                <CodeEditor
+                  filePath={selectedFile}
+                  content={files[selectedFile] || ''}
+                  readOnly
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  Select a file to preview
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
+
+      {explainOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
+          <div className="w-full max-w-3xl max-h-[80vh] overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+              <h3 className="text-lg font-semibold">Generated Codebase Explanation</h3>
+              <button onClick={() => setExplainOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 max-h-[calc(80vh-74px)] overflow-y-auto">
+              <div>
+                <label className="block text-xs text-gray-400 mb-2">Ask a focused question</label>
+                <div className="flex gap-2">
+                  <input
+                    value={explainQuestion}
+                    onChange={(e) => setExplainQuestion(e.target.value)}
+                    className="input-field flex-1"
+                    placeholder="Explain auth flow, API wiring, and folder architecture"
+                  />
+                  <button onClick={handleExplainCodebase} disabled={explaining} className="btn-primary px-4 py-2">
+                    {explaining ? 'Explaining...' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+
+              {explanation ? (
+                <div className="space-y-4 text-sm">
+                  <div className="card p-4">
+                    <p className="text-gray-200 leading-relaxed">{explanation.overview}</p>
+                  </div>
+
+                  <div className="card p-4">
+                    <h4 className="font-semibold mb-2">Architecture</h4>
+                    {(explanation.architecture || []).map((item, index) => (
+                      <p key={`arch-${index}`} className="text-gray-300">• {item}</p>
+                    ))}
+                  </div>
+
+                  <div className="card p-4">
+                    <h4 className="font-semibold mb-2">Request Flow</h4>
+                    {(explanation.requestFlow || []).map((item, index) => (
+                      <p key={`flow-${index}`} className="text-gray-300">• {item}</p>
+                    ))}
+                  </div>
+
+                  <div className="card p-4">
+                    <h4 className="font-semibold mb-2">Key Files</h4>
+                    {(explanation.keyFiles || []).map((item, index) => (
+                      <p key={`key-${index}`} className="text-gray-300">
+                        • <span className="text-orange-300 font-mono">{item.path}</span>: {item.purpose}
+                      </p>
+                    ))}
+                  </div>
+
+                  <div className="card p-4">
+                    <h4 className="font-semibold mb-2">Risks / Gaps</h4>
+                    {(explanation.securityAndRisks || []).map((item, index) => (
+                      <p key={`risk-${index}`} className="text-gray-300">• {item}</p>
+                    ))}
+                  </div>
+
+                  <div className="card p-4">
+                    <h4 className="font-semibold mb-2">Next Steps</h4>
+                    {(explanation.nextSteps || []).map((item, index) => (
+                      <p key={`next-${index}`} className="text-gray-300">• {item}</p>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-400">No explanation available yet.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

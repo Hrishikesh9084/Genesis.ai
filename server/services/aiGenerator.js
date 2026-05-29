@@ -787,6 +787,169 @@ function parseAndValidateFiles(content, prompt) {
   return ensureCoreFiles(normalized, prompt);
 }
 
+function isCodeLikeFile(filePath) {
+  return /\.(js|jsx|ts|tsx|json|css|scss|sass|html|md|yml|yaml|env)$/i.test(filePath || '');
+}
+
+function detectLikelyCodeErrors(files) {
+  const issues = [];
+  const entries = Object.entries(files || {});
+
+  for (const [filePath, contentRaw] of entries) {
+    if (!isCodeLikeFile(filePath)) continue;
+    const content = String(contentRaw || '');
+
+    if (!content.trim()) {
+      issues.push(`${filePath}: file is empty`);
+    }
+    if (/^```|```$/m.test(content)) {
+      issues.push(`${filePath}: contains markdown code fences`);
+    }
+    if (content.includes('<<<<<<<') || content.includes('=======') || content.includes('>>>>>>>')) {
+      issues.push(`${filePath}: contains merge conflict markers`);
+    }
+    if (/\bTODO\b|\bFIXME\b/.test(content) && isCodeLikeFile(filePath)) {
+      issues.push(`${filePath}: contains unfinished TODO/FIXME markers`);
+    }
+
+    if (filePath.endsWith('.json')) {
+      try {
+        JSON.parse(content);
+      } catch {
+        issues.push(`${filePath}: invalid JSON`);
+      }
+    }
+  }
+
+  return issues.slice(0, 30);
+}
+
+function selectFilesForAutoFix(files, maxFiles = 120, maxChars = 180000) {
+  const entries = Object.entries(files || {});
+  const priority = [];
+  const secondary = [];
+
+  for (const [filePath, content] of entries) {
+    const row = [filePath, String(content || '')];
+    if (
+      filePath === 'client/package.json' ||
+      filePath === 'server/package.json' ||
+      filePath === 'client/vite.config.js' ||
+      filePath === 'server/index.js' ||
+      filePath.startsWith('client/src/') ||
+      filePath.startsWith('server/routes/') ||
+      filePath.startsWith('server/controllers/') ||
+      filePath.startsWith('server/services/') ||
+      filePath.startsWith('server/middleware/')
+    ) {
+      priority.push(row);
+    } else {
+      secondary.push(row);
+    }
+  }
+
+  const ordered = [...priority, ...secondary].sort((a, b) => a[0].localeCompare(b[0]));
+  const selected = {};
+  let totalChars = 0;
+  let totalFiles = 0;
+
+  for (const [filePath, content] of ordered) {
+    if (totalFiles >= maxFiles) break;
+    const trimmed = content.slice(0, 6000);
+    const nextChars = totalChars + trimmed.length;
+    if (nextChars > maxChars) break;
+    selected[filePath] = trimmed;
+    totalChars = nextChars;
+    totalFiles += 1;
+  }
+
+  return selected;
+}
+
+async function autoFixGeneratedCode(files, prompt, stack, modelName) {
+  const safeFiles = ensureCoreFiles(files || {}, prompt);
+  const issues = detectLikelyCodeErrors(safeFiles);
+
+  // Only run repair when we see likely issues to avoid unnecessary latency.
+  if (issues.length === 0) {
+    return {
+      files: safeFiles,
+      fixed: false,
+      reason: 'No likely errors detected',
+      fixedFiles: [],
+    };
+  }
+
+  const modelSequence = [];
+  const preferred = resolveModel(modelName);
+  if (preferred) modelSequence.push(preferred);
+  if (!modelSequence.includes(DEFAULT_MODEL)) modelSequence.push(DEFAULT_MODEL);
+
+  const candidateFiles = selectFilesForAutoFix(safeFiles);
+  const systemPrompt = `You are a senior debugging engineer. Repair generated full-stack code files.
+Return ONLY valid JSON mapping changed file paths to FULL corrected file contents.
+Rules:
+- Return ONLY changed files. Do not include unchanged files.
+- Keep architecture and behavior intact.
+- Fix syntax errors, invalid JSON/config, broken imports/exports, and obviously broken API wiring.
+- No markdown, no backticks, no comments outside code strings.`;
+
+  const userPrompt = `Fix code errors in this generated project.
+
+Original product prompt:
+${String(prompt || '')}
+
+Stack:
+${String(stack || 'fullstack')}
+
+Likely issues:
+${issues.map((i, idx) => `${idx + 1}. ${i}`).join('\n')}
+
+Files snapshot (trimmed where needed):
+${JSON.stringify(candidateFiles, null, 2)}
+
+Return a JSON object where keys are changed file paths and values are full corrected file contents.
+If nothing must change, return {}.`;
+
+  let lastErr = null;
+  for (const targetModel of modelSequence) {
+    try {
+      const content = await callModel(targetModel, systemPrompt, userPrompt);
+      const json = extractJsonObject(content);
+      const changes = normalizeFilesMap(json);
+      const changedPaths = Object.keys(changes || {});
+
+      if (changedPaths.length === 0) {
+        return {
+          files: safeFiles,
+          fixed: false,
+          reason: 'Auto-fix pass found no required changes',
+          fixedFiles: [],
+          detectedIssues: issues,
+        };
+      }
+
+      const merged = ensureCoreFiles({ ...safeFiles, ...changes }, prompt);
+      return {
+        files: merged,
+        fixed: true,
+        fixedFiles: changedPaths,
+        detectedIssues: issues,
+      };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+
+  return {
+    files: safeFiles,
+    fixed: false,
+    reason: `Auto-fix failed: ${String(lastErr?.message || 'unknown error')}`,
+    fixedFiles: [],
+    detectedIssues: issues,
+  };
+}
+
 // ---- Continuation for truncated responses ----
 
 async function continueJsonResponse(modelId, partialJson) {
@@ -1320,8 +1483,9 @@ const aiGenerator = {
   buildPreviewSkeleton,
   generateProject,
   editProject,
+  autoFixGeneratedCode,
   generateStructuredJson,
 };
 
-export { DEFAULT_MODEL, getAvailableModels, buildPreviewSkeleton, generateProject, editProject, generateStructuredJson };
+export { DEFAULT_MODEL, getAvailableModels, buildPreviewSkeleton, generateProject, editProject, autoFixGeneratedCode, generateStructuredJson };
 export default aiGenerator;
