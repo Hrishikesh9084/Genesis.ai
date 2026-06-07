@@ -44,7 +44,6 @@ function UserAvatar({ user, sizeClass = "md:w-11 md:h-11 cursor-pointer" }) {
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState(null);
   const dropdownContainerRef = useRef(null);
   const navigate = useNavigate();
@@ -54,9 +53,7 @@ export default function Navbar() {
   const publicLinks = [
     { name: "Home", href: "/" },
     { name: "Pricing", href: "/plans" },
-    { name: "Docs", href: "/docs" },
     { name: "About", href: "/about" },
-    { name: "Careers", href: "/careers" },
     { name: "Contact", href: "/contact" },
   ];
 
@@ -81,18 +78,9 @@ export default function Navbar() {
   const loggedInTopLinks = [
     { name: "Home", href: "/" },
     { name: "Pricing", href: "/plans" },
-    { name: "Docs", href: "/docs" },
   ];
 
   const loggedInNavSections = [
-    {
-      name: "Careers",
-      links: [
-        { name: "Job Openings", href: "/careers" },
-        // { name: "Apply", href: "/careers/apply" },
-        { name: "Track Status", href: "/careers/status" },
-      ],
-    },
     {
       name: "Workspace",
       links: authLinks,
@@ -108,37 +96,15 @@ export default function Navbar() {
     {
       name: "Platform",
       links: [
-        { name: "Docs", href: "/docs" },
         { name: "About", href: "/about" },
         { name: "Contact", href: "/contact" },
       ],
     },
   ];
 
-  const careersMobileLinks = [
-    { name: "Apply", href: "/careers/apply" },
-    { name: "Track Status", href: "/careers/status" },
-  ];
-
   const mobileLinks = user
-    ? [...publicLinks, ...careersMobileLinks, ...authLinks, ...adminLinks]
-    : [...publicLinks, ...careersMobileLinks];
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
+    ? [...publicLinks, ...authLinks, ...adminLinks]
+    : [...publicLinks];
 
   useEffect(() => {
     setActiveDropdown(null);
@@ -186,7 +152,7 @@ export default function Navbar() {
                 }
             `}</style>
       <motion.nav
-        className={`sticky top-0 z-50 flex w-full items-center justify-between px-4 py-3.5 md:px-16 lg:px-24 transition-colors ${isScrolled ? "bg-black/50 backdrop-blur-lg" : ""}`}
+        className="sticky top-0 z-50 flex w-full items-center justify-between px-4 py-3.5 transition-colors md:px-16 lg:px-24 backdrop-blur-lg "
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         viewport={{ once: true }}
@@ -211,7 +177,7 @@ export default function Navbar() {
           />
         </Link>
 
-        <div className="hidden items-center space-x-8 md:flex">
+        <div className="hidden items-center space-x-8 transition-all duration-300 md:flex">
           {user ? (
             <div ref={dropdownContainerRef} className="flex items-center gap-5">
               {loggedInTopLinks.map((link) => (
@@ -246,22 +212,27 @@ export default function Navbar() {
                   </button>
 
                   <div
-                    className={`absolute left-0 top-full z-50 mt-3 min-w-48 rounded-xl border border-gray-700 bg-gray-900/95 p-2 shadow-2xl backdrop-blur-lg transition duration-150 ${
+                    role="menu"
+                    className={`absolute left-0 top-full z-50 mt-2 min-w-[16rem] rounded-xl border border-gray-700 bg-gradient-to-b from-gray-900/95 to-gray-900/80 p-3 shadow-2xl backdrop-blur-lg transform transition-all duration-200 origin-top-left ${
                       activeDropdown === section.name
-                        ? "visible opacity-100"
-                        : "invisible opacity-0"
+                        ? "opacity-100 translate-y-0 scale-100 pointer-events-auto"
+                        : "opacity-0 translate-y-1 scale-95 pointer-events-none"
                     }`}
                   >
-                    {section.links.map((link) => (
-                      <Link
-                        key={`${section.name}-${link.name}`}
-                        to={link.href}
-                        onClick={() => setActiveDropdown(null)}
-                        className="block rounded-lg px-3 py-2 text-sm text-gray-200 transition hover:bg-gray-800 hover:text-orange-300"
-                      >
-                        {link.name}
-                      </Link>
-                    ))}
+                    <div className="flex flex-col gap-1">
+                      {section.links.map((link) => (
+                        <Link
+                          key={`${section.name}-${link.name}`}
+                          to={link.href}
+                          onClick={() => setActiveDropdown(null)}
+                          role="menuitem"
+                          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-200 transition hover:bg-gray-800/60 hover:text-orange-300"
+                        >
+                          <span className="flex h-2 w-2 shrink-0 rounded-full bg-orange-400/60" />
+                          <span>{link.name}</span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}

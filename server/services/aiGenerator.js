@@ -1192,7 +1192,7 @@ async function callModel(modelId, systemPrompt, userPrompt) {
 
 // ---- Two-phase generation for large apps ----
 
-async function generateProjectInPhases(modelId, prompt, stack) {
+async function generateProjectInPhases(modelId, prompt, stack, onProgress) {
   console.log(`[aiGenerator] Starting two-phase generation for large app...`);
 
   // Phase 1: Generate backend
@@ -1228,6 +1228,10 @@ Return ONLY a JSON object where keys are file paths (starting with "server/") an
       backendFiles = extractJsonObject(mergeJsonParts(backendContent, contd));
     } else {
       backendFiles = extractJsonObject(backendContent);
+    }
+
+    if (typeof onProgress === 'function') {
+      await onProgress({ phase: 'backend', files: normalizeFilesMap(backendFiles) });
     }
   } catch (e) {
     console.warn('[aiGenerator] Phase 1 parse failed:', e.message);
@@ -1294,7 +1298,13 @@ Return ONLY a JSON object where keys are file paths and values are COMPLETE file
   // Merge both phases
   const mergedFiles = { ...normalizeFilesMap(backendFiles), ...normalizeFilesMap(frontendFiles) };
   console.log(`[aiGenerator] Two-phase generation complete: ${Object.keys(mergedFiles).length} files`);
-  return ensureCoreFiles(mergedFiles, prompt);
+  const completeFiles = ensureCoreFiles(mergedFiles, prompt);
+
+  if (typeof onProgress === 'function') {
+    await onProgress({ phase: 'complete', files: completeFiles });
+  }
+
+  return completeFiles;
 }
 
 const generateProject = async (prompt, stack, modelName) => {
@@ -1482,10 +1492,11 @@ const aiGenerator = {
   getAvailableModels,
   buildPreviewSkeleton,
   generateProject,
+  generateProjectInPhases,
   editProject,
   autoFixGeneratedCode,
   generateStructuredJson,
 };
 
-export { DEFAULT_MODEL, getAvailableModels, buildPreviewSkeleton, generateProject, editProject, autoFixGeneratedCode, generateStructuredJson };
+export { DEFAULT_MODEL, getAvailableModels, buildPreviewSkeleton, generateProject, generateProjectInPhases, editProject, autoFixGeneratedCode, generateStructuredJson };
 export default aiGenerator;

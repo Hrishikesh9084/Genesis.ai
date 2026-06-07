@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, MessageCircle, Send, X, Loader2 } from "lucide-react";
+import { Bot, MessageCircle, Send, Sparkles, X, Loader2 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import api from "../services/api";
 
@@ -20,10 +20,20 @@ export default function HelpBot() {
   const [messages, setMessages] = useState([
     {
       role: "bot",
-      text: "Hi, I am Genesis Help Bot. Ask me about credits, pricing, project generation, deployment, or account settings.",
+      text: "Hi, I am Genesis Help Bot. Ask me about credits, pricing, project generation, deployment, account settings, or use the Project Planner tool.",
       source: "faq",
     },
   ]);
+
+  const quickTools = [
+    {
+      id: "project-planner",
+      label: "Project Planner",
+      description: "Turn an idea into a step-by-step build plan.",
+      prompt:
+        "Act as a Genesis.ai project planner. I want a concise build plan with recommended stack, core features, database needs, and the first 5 implementation steps for my app idea.",
+    },
+  ];
 
   useEffect(() => {
     try {
@@ -93,8 +103,8 @@ export default function HelpBot() {
     event.currentTarget.setPointerCapture?.(event.pointerId);
   };
 
-  const sendMessage = async () => {
-    const message = input.trim();
+  const sendMessage = async (overrideMessage) => {
+    const message = String(overrideMessage ?? input).trim();
     if (!message || sending) return;
 
     const nextMessages = [...messages, { role: "user", text: message }];
@@ -129,6 +139,11 @@ export default function HelpBot() {
     }
   };
 
+  const handleToolClick = (tool) => {
+    setInput(tool.prompt);
+    void sendMessage(tool.prompt);
+  };
+
   return (
     <div
       className="fixed z-60 p-2 sm:p-5"
@@ -160,6 +175,32 @@ export default function HelpBot() {
               >
                 <X className="h-4 w-4" />
               </button>
+            </div>
+
+            <div className="border-b border-white/10 px-3 py-3 sm:px-4">
+              <div className="mb-2 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-gray-500">
+                <Sparkles className="h-3.5 w-3.5 text-orange-400" />
+                AI Tools
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {quickTools.map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    onClick={() => handleToolClick(tool)}
+                    disabled={sending}
+                    className="group rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-left transition hover:border-orange-400/50 hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    title={tool.description}
+                  >
+                    <div className="text-xs font-semibold text-orange-200 group-hover:text-orange-100">
+                      {tool.label}
+                    </div>
+                    <div className="mt-0.5 max-w-56 text-[11px] leading-4 text-gray-400">
+                      {tool.description}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div

@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import PDFDocument from 'pdfkit';
 
 const DECISION_MEMORY_FILE_PATH = '.genesis/decision-memory.json';
 const DEP_INSTALL_REPORT_FILE_PATH = '.genesis/dependency-install-report.json';
@@ -363,7 +364,37 @@ const createProject = async (req, res, next) => {
 async function generateProjectAsync(projectId, prompt, stack, modelName, intentMode, installNodeModules = true) {
   try {
     const promptWithIntent = buildIntentAnnotatedPrompt(prompt, intentMode, []);
-    const generatedFiles = await aiGenerator.generateProject(promptWithIntent, stack, modelName);
+    let generatedFiles;
+
+    try {
+      generatedFiles = await aiGenerator.generateProjectInPhases(
+        modelName || aiGenerator.DEFAULT_MODEL,
+        promptWithIntent,
+        stack,
+        async ({ phase, files }) => {
+          if (!files || Object.keys(files).length === 0) {
+            return;
+          }
+
+          if (phase !== 'backend' && phase !== 'complete') {
+            return;
+          }
+
+          try {
+            await db.query('UPDATE projects SET files = $1, updated_at = NOW() WHERE id = $2', [
+              JSON.stringify(files),
+              projectId,
+            ]);
+          } catch (progressErr) {
+            console.warn(`[projectController] Failed to persist ${phase} progress for project ${projectId}:`, progressErr);
+          }
+        }
+      );
+    } catch (phaseErr) {
+      console.warn(`[projectController] Phased generation failed for project ${projectId}. Falling back to single-pass generation.`, phaseErr);
+      generatedFiles = await aiGenerator.generateProject(promptWithIntent, stack, modelName);
+    }
+
     const autoFixResult = await aiGenerator.autoFixGeneratedCode(generatedFiles, prompt, stack, modelName);
     const filesToSave = autoFixResult?.files || generatedFiles;
 
@@ -561,6 +592,103 @@ Return JSON with this exact shape:
   }
 };
 
+const explainProjectPdf = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { question, model, intentMode } = req.body || {};
+
+    const result = await db.query('SELECT * FROM projects WHERE id = $1 AND user_id = $2', [
+      id,
+      req.user.id,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Project not found.' });
+    }
+
+    const project = result.rows[0];
+    const selectedModel = model || project.model || aiGenerator.DEFAULT_MODEL;
+    const files = parseProjectFiles(project.files);
+    const decisionMemory = getDecisionMemoryEntries(files);
+    const resolvedIntentMode = normalizeIntentMode(intentMode || decisionMemory.at(-1)?.intentMode || DEFAULT_INTENT_MODE);
+    const fileSummary = summarizeFilesForExplanation(files);
+
+    const explanation = await aiGenerator.generateStructuredJson({
+      modelName: selectedModel,
+      systemPrompt: `You explain generated codebases to developers. Be concise, concrete, and implementation-focused. Return JSON only.`,
+      userPrompt: `Explain this generated codebase as structured JSON.
+
+Intent mode: ${resolvedIntentMode}
+Project name: ${project.name}
+Original prompt: ${project.prompt}
+User question: ${String(question || 'Give me a complete technical walkthrough of this codebase.')}
+
+Decision memory entries:
+${JSON.stringify(decisionMemory.slice(-8), null, 2)}
+
+File previews (path + first 700 chars):
+${JSON.stringify(fileSummary, null, 2)}
+
+Return JSON with this exact shape:
+{
+  "overview": "...",
+  "architecture": ["..."],
+  "requestFlow": ["..."],
+  "keyFiles": [{"path":"...","purpose":"..."}],
+  "dataModel": ["..."],
+  "securityAndRisks": ["..."],
+  "nextSteps": ["..."]
+}
+`,
+    });
+
+    // Generate PDF
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const safeName = String(project.name || 'project').replace(/[^a-zA-Z0-9-_]/g, '-') || 'project';
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}-explanation.pdf"`);
+
+    doc.pipe(res);
+
+    doc.fontSize(18).text(`${project.name} — Codebase Explanation`, { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(11).text(`Intent mode: ${resolvedIntentMode}`);
+    doc.text(`Generated: ${new Date().toISOString()}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text('Overview', { underline: true });
+    doc.moveDown(0.25);
+    doc.fontSize(11).text(explanation.overview || 'N/A', { paragraphGap: 6 });
+    doc.moveDown();
+
+    const writeList = (title, items) => {
+      doc.fontSize(14).text(title, { underline: true });
+      doc.moveDown(0.25);
+      doc.fontSize(11);
+      if (!items || (Array.isArray(items) && items.length === 0)) {
+        doc.text('None');
+      } else {
+        items.forEach((it, i) => {
+          const line = typeof it === 'string' ? it : it.path ? `${it.path} — ${it.purpose || ''}` : JSON.stringify(it);
+          doc.text(`${i + 1}. ${line}`);
+        });
+      }
+      doc.moveDown();
+    };
+
+    writeList('Architecture', explanation.architecture);
+    writeList('Request Flow', explanation.requestFlow);
+    writeList('Key Files', (explanation.keyFiles || []).map(k => (k.path ? `${k.path}: ${k.purpose || ''}` : JSON.stringify(k))));
+    writeList('Data Model', explanation.dataModel);
+    writeList('Risks / Security', explanation.securityAndRisks);
+    writeList('Next Steps', explanation.nextSteps);
+
+    doc.end();
+  } catch (err) {
+    next(err);
+  }
+};
+
 const updateProjectFiles = async (req, res, next) => {
   try {
     const { files } = req.body;
@@ -663,6 +791,7 @@ export default {
   getProject,
   createProject,
   explainProject,
+  explainProjectPdf,
   editProject,
   updateProjectFiles,
   deleteProject,

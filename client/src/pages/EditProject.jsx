@@ -5,6 +5,7 @@ import api from '../services/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { validateEditPrompt } from '../utils/validators';
+import inferIntentFromText from '../utils/intent';
 
 const editExamples = [
   'Add a dark mode toggle to the navbar',
@@ -38,6 +39,7 @@ export default function EditProject() {
   const [loading, setLoading] = useState(true);
   const [editPrompt, setEditPrompt] = useState('');
   const [intentMode, setIntentMode] = useState('balanced');
+  const [intentModeTouched, setIntentModeTouched] = useState(false);
   const [model, setModel] = useState('');
   const [providers, setProviders] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -116,6 +118,7 @@ export default function EditProject() {
             const latestIntent = memory[memory.length - 1]?.intentMode;
             if (intentOptions.some((item) => item.value === latestIntent)) {
               setIntentMode(latestIntent);
+              setIntentModeTouched(false);
             }
           }
         }
@@ -129,6 +132,15 @@ export default function EditProject() {
       setLoading(false);
     }
   };
+
+  // Auto-select intent based on the edit prompt unless user changed it or a memory set it
+  useEffect(() => {
+    if (intentModeTouched) return;
+    if (!editPrompt || !editPrompt.trim()) return;
+    if (intentMode && intentMode !== 'balanced') return; // respect existing selection (e.g., from memory)
+    const inferred = inferIntentFromText(editPrompt);
+    if (inferred && inferred !== intentMode) setIntentMode(inferred);
+  }, [editPrompt, intentModeTouched, intentMode]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -203,7 +215,7 @@ export default function EditProject() {
           <label className="block text-sm font-medium text-gray-300 mb-1.5">Intent Mode</label>
           <select
             value={intentMode}
-            onChange={(e) => setIntentMode(e.target.value)}
+            onChange={(e) => { setIntentMode(e.target.value); setIntentModeTouched(true); }}
             className="input-field"
           >
             {intentOptions.map((option) => (

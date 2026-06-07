@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "cloudinary": "^2.9.0",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "jspdf": "^4.2.1"
   }
 }

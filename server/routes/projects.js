@@ -14,6 +14,7 @@ router.get('/:id', validators.validateProjectIdParam, projectController.getProje
 router.post('/', validators.validateCreateProject, projectController.createProject);
 router.post('/:id/cancel', validators.validateProjectIdParam, projectController.cancelProject);
 router.post('/:id/explain', validators.validateProjectIdParam, validators.validateExplainProject, projectController.explainProject);
+router.post('/:id/explain/pdf', validators.validateProjectIdParam, validators.validateExplainProject, projectController.explainProjectPdf);
 router.put('/:id/edit', validators.validateProjectIdParam, validators.validateEditProject, projectController.editProject);
 router.put('/:id/files', validators.validateProjectIdParam, validators.validateProjectFiles, projectController.updateProjectFiles);
 router.delete('/:id', validators.validateProjectIdParam, projectController.deleteProject);

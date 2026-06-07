@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Copy, Check } from 'lucide-react';
 import Editor, { loader } from '@monaco-editor/react';
 
@@ -19,13 +19,77 @@ function getLanguage(filePath) {
   return map[ext] || 'text';
 }
 
-export default function CodeEditor({ filePath, content, onChange, readOnly = false }) {
+function getSharedPrefixLength(left, right) {
+  const limit = Math.min(left.length, right.length);
+  let index = 0;
+
+  while (index < limit && left[index] === right[index]) {
+    index += 1;
+  }
+
+  return index;
+}
+
+export default function CodeEditor({ filePath, content, onChange, readOnly = false, liveTyping = false }) {
   const [copied, setCopied] = useState(false);
   const [localContent, setLocalContent] = useState(content);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimerRef = useRef(null);
+  const lastFilePathRef = useRef(filePath);
+
+  const clearTypingTimer = () => {
+    if (typingTimerRef.current) {
+      window.clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
-    setLocalContent(content);
-  }, [content]);
+    if (!liveTyping) {
+      clearTypingTimer();
+      setIsTyping(false);
+      setLocalContent(content);
+      return undefined;
+    }
+
+    const targetContent = content || '';
+    const fileChanged = lastFilePathRef.current !== filePath;
+    lastFilePathRef.current = filePath;
+    clearTypingTimer();
+
+    if (!fileChanged && targetContent === localContent) {
+      setIsTyping(false);
+      return undefined;
+    }
+
+    const sharedPrefixLength = fileChanged ? 0 : getSharedPrefixLength(localContent || '', targetContent);
+    const startContent = targetContent.slice(0, sharedPrefixLength);
+    const remainingContent = targetContent.slice(sharedPrefixLength);
+    const stepSize = Math.max(1, Math.ceil(Math.max(remainingContent.length, 1) / 120));
+
+    setLocalContent(startContent);
+    setIsTyping(remainingContent.length > 0);
+
+    let currentLength = sharedPrefixLength;
+
+    const typeNextChunk = () => {
+      currentLength = Math.min(currentLength + stepSize, targetContent.length);
+      setLocalContent(targetContent.slice(0, currentLength));
+
+      if (currentLength < targetContent.length) {
+        typingTimerRef.current = window.setTimeout(typeNextChunk, 12);
+      } else {
+        typingTimerRef.current = null;
+        setIsTyping(false);
+      }
+    };
+
+    if (sharedPrefixLength < targetContent.length) {
+      typingTimerRef.current = window.setTimeout(typeNextChunk, 12);
+    }
+
+    return clearTypingTimer;
+  }, [content, liveTyping]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(localContent);
@@ -45,6 +109,11 @@ export default function CodeEditor({ filePath, content, onChange, readOnly = fal
         <div className="flex items-center space-x-2">
           <span className="text-sm text-gray-400 font-mono">{filePath}</span>
           <span className="text-xs px-2 py-0.5 bg-gray-800 text-gray-500 rounded">{getLanguage(filePath)}</span>
+          {isTyping && liveTyping && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-300 border border-orange-500/20">
+              typing
+            </span>
+          )}
         </div>
         <button onClick={handleCopy} className="text-gray-500 hover:text-white transition-colors p-1">
           {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}

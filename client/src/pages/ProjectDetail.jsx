@@ -66,19 +66,34 @@ export default function ProjectDetail() {
   }, [files, intentModeTouched]);
 
   useEffect(() => {
+    if (!explainOpen) return undefined;
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = documentElement.style.overflow;
+
+    body.style.overflow = 'hidden';
+    documentElement.style.overflow = 'hidden';
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [explainOpen]);
+
+  useEffect(() => {
     fetchProject();
-    const interval = setInterval(() => {
-      if (project?.status === 'generating') fetchProject();
-    }, 3000);
-    return () => clearInterval(interval);
   }, [id]);
 
   useEffect(() => {
-    if (project?.status === 'generating') {
-      const interval = setInterval(fetchProject, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [project?.status]);
+    if (project?.status !== 'generating') return undefined;
+
+    const interval = setInterval(() => {
+      fetchProject();
+    }, 1200);
+
+    return () => clearInterval(interval);
+  }, [project?.status, id]);
 
   const fetchProject = async () => {
     try {
@@ -180,6 +195,20 @@ export default function ProjectDetail() {
       toast.error(err.response?.data?.error || 'Failed to explain codebase');
     } finally {
       setExplaining(false);
+    }
+  };
+
+  const handleDownloadExplanationPdf = async () => {
+    if (!explanation) {
+      toast.error('No explanation available to download');
+      return;
+    }
+    try {
+      const res = await api.post(`/projects/${id}/explain/pdf`, { question: explainQuestion, intentMode }, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      saveAs(blob, `${project.name.replace(/[^a-zA-Z0-9-_]/g, '-')}-explanation.pdf`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to download PDF');
     }
   };
 
@@ -561,6 +590,8 @@ export default function ProjectDetail() {
                   filePath={selectedFile}
                   content={files[selectedFile] || ''}
                   onChange={handleFileChange}
+                  readOnly
+                  liveTyping
                   />
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
@@ -599,15 +630,21 @@ export default function ProjectDetail() {
       </div>
 
       {explainOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
-          <div className="w-full max-w-3xl max-h-[80vh] overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 px-4 py-4 backdrop-blur-sm">
+          <div className="flex max-h-[calc(100vh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-700 bg-gray-900 shadow-2xl">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
               <h3 className="text-lg font-semibold">Generated Codebase Explanation</h3>
-              <button onClick={() => setExplainOpen(false)} className="text-gray-400 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={handleDownloadExplanationPdf} disabled={!explanation} className="btn-secondary text-sm px-3 py-1.5 flex items-center space-x-2">
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Download PDF</span>
+                </button>
+                <button onClick={() => setExplainOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-            <div className="p-5 space-y-4 max-h-[calc(80vh-74px)] overflow-y-auto">
+            <div data-lenis-prevent className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
               <div>
                 <label className="block text-xs text-gray-400 mb-2">Ask a focused question</label>
                 <div className="flex gap-2">
