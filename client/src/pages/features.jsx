@@ -42,7 +42,7 @@ export default function Features() {
                 description="A startup operating system where AI helps you plan, build, secure, and grow software products."
             />
 
-            <div className="mt-10 grid gap-5 px-4 sm:px-6 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-10 grid gap-5 px-4 sm:px-6 md:grid-cols-2">
                 {featuresData.map((feature, index) => (
                     <motion.div
                         key={index}
