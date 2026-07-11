@@ -38,7 +38,7 @@ export default function Features() {
     return (
         <section className="mt-28">
             <SectionTitle
-                title="Genesis 3.0 features"
+                title="Genesis features"
                 description="A startup operating system where AI helps you plan, build, secure, and grow software products."
             />
 

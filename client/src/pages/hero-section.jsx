@@ -43,7 +43,7 @@ export default function HeroSection() {
                     viewport={{ once: true }}
                     transition={{ delay: 0.2, type: "spring", stiffness: 320, damping: 70, mass: 1 }}
                 >
-                    Genesis 3.0 combines a premium SaaS interface with an AI startup operating system for product planning, engineering, QA, security, marketing, and business decisions.
+                    Genesis combines a premium SaaS interface with an AI startup operating system for product planning, engineering, QA, security, marketing, and business decisions.
                 </motion.p>
 
                 <motion.div className="flex flex-col md:flex-row max-md:w-full items-center gap-4 md:gap-3 mt-8"
