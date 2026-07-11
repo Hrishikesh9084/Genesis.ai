@@ -64,6 +64,7 @@ export default function Navbar() {
 
   const authLinks = [
     { name: "Dashboard", href: "/dashboard" },
+    { name: "AI CTO", href: "/ai-cto" },
     { name: "Domains", href: "/domains" },
     { name: "New Project", href: "/new-project" },
   ];

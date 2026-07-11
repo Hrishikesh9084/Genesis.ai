@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Sparkles, FolderOpen } from 'lucide-react';
+import { Plus, Search, Sparkles, FolderOpen, BrainCircuit, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 import ProjectCard from '../components/ProjectCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -46,10 +46,32 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold">Your Projects</h1>
           <p className="text-gray-400 mt-1">{projects.length} project{projects.length !== 1 ? 's' : ''}</p>
         </div>
-        <Link to="/new-project" className="btn-primary flex items-center gap-2 rounded-xl">
-          <Plus className="w-5 h-5" />
-          <span>New Project</span>
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link to="/ai-cto" className="inline-flex items-center gap-2 rounded-xl border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm font-medium text-orange-200 transition hover:bg-orange-500/20">
+            <BrainCircuit className="w-5 h-5" />
+            <span>AI CTO</span>
+          </Link>
+          <Link to="/new-project" className="btn-primary flex items-center gap-2 rounded-xl">
+            <Plus className="w-5 h-5" />
+            <span>New Project</span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="card mb-8 border border-orange-500/20 bg-orange-500/5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-orange-300">AI CTO</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Analyze startup ideas before you build them</h2>
+            <p className="mt-2 max-w-2xl text-sm text-gray-300">
+              Get architecture, MVP scope, roadmap, technical risk analysis, product priorities, and business guidance from a single startup analysis flow.
+            </p>
+          </div>
+          <Link to="/ai-cto" className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-600">
+            Open AI CTO
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
 
       {projects.length > 0 && (

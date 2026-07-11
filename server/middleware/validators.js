@@ -207,6 +207,52 @@ function validateExplainProject(req, res, next) {
   next();
 }
 
+function validateCtoAnalyze(req, res, next) {
+  const {
+    idea,
+    audience,
+    goal,
+    budget,
+    timeline,
+    constraints,
+    model,
+  } = req.body || {};
+
+  if (!String(idea || '').trim()) {
+    return badRequest(res, 'idea is required.');
+  }
+
+  if (String(idea).trim().length < 30) {
+    return badRequest(res, 'idea must be at least 30 characters.');
+  }
+
+  if (audience !== undefined && typeof audience !== 'string') {
+    return badRequest(res, 'audience must be a string.');
+  }
+
+  if (goal !== undefined && typeof goal !== 'string') {
+    return badRequest(res, 'goal must be a string.');
+  }
+
+  if (budget !== undefined && typeof budget !== 'string') {
+    return badRequest(res, 'budget must be a string.');
+  }
+
+  if (timeline !== undefined && typeof timeline !== 'string') {
+    return badRequest(res, 'timeline must be a string.');
+  }
+
+  if (constraints !== undefined && typeof constraints !== 'string') {
+    return badRequest(res, 'constraints must be a string.');
+  }
+
+  if (model !== undefined && typeof model !== 'string') {
+    return badRequest(res, 'model must be a string.');
+  }
+
+  next();
+}
+
 function validateProjectFiles(req, res, next) {
   const { files } = req.body || {};
   if (!files || typeof files !== 'object' || Array.isArray(files)) {
@@ -402,7 +448,7 @@ function validateDeployIdParam(req, res, next) {
 }
 
 function validateContactSubmission(req, res, next) {
-  const { name, email, subject, message } = req.body || {};
+  const { name, email, subject, message, callbackRequested, phone } = req.body || {};
 
   if (!String(name || '').trim()) {
     return badRequest(res, 'Name is required.');
@@ -430,6 +476,16 @@ function validateContactSubmission(req, res, next) {
 
   if (String(message).trim().length > 5000) {
     return badRequest(res, 'Message must be 5000 characters or fewer.');
+  }
+
+  if (callbackRequested === true || callbackRequested === 'true') {
+    if (!String(phone || '').trim()) {
+      return badRequest(res, 'Phone number is required for callback requests.');
+    }
+
+    if (String(phone).trim().length > 40) {
+      return badRequest(res, 'Phone number must be 40 characters or fewer.');
+    }
   }
 
   next();
@@ -465,8 +521,10 @@ function validateCareerApplication(req, res, next) {
     linkedinUrl,
     portfolioUrl,
     coverLetter,
+    recaptchaToken,
     hcaptchaToken,
   } = req.body || {};
+  const captchaToken = String(recaptchaToken || hcaptchaToken || '').trim();
 
   const fail = (message) => {
     if (req.file?.path) {
@@ -512,20 +570,12 @@ function validateCareerApplication(req, res, next) {
     return fail('portfolioUrl must be a valid http/https URL.');
   }
 
-  if (!String(coverLetter || '').trim()) {
-    return fail('coverLetter is required.');
-  }
-
-  if (String(coverLetter).trim().length < 50) {
-    return fail('coverLetter must be at least 50 characters.');
-  }
-
   if (String(coverLetter).trim().length > 5000) {
     return fail('coverLetter must be 5000 characters or fewer.');
   }
 
-  if (hcaptchaToken !== undefined && String(hcaptchaToken).trim().length > 4000) {
-    return fail('hcaptchaToken is invalid.');
+  if (captchaToken.length > 4000) {
+    return fail('recaptchaToken is invalid.');
   }
 
   next();
@@ -795,6 +845,7 @@ export default {
   validateCreateProject,
   validateEditProject,
   validateExplainProject,
+  validateCtoAnalyze,
   validateProjectFiles,
   validateGithubPush,
   validateUpdateProfile,

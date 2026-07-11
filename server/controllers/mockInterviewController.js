@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import mockInterviewService from '../services/mockInterviewService.js';
 
-const DEFAULT_MODEL = process.env.MOCK_INTERVIEW_MODEL || 'gpt-4o-mini';
+const DEFAULT_MODEL = process.env.MOCK_INTERVIEW_MODEL || 'mistral-small-latest';
 
 async function safeDeleteUploadedFile(filePath) {
   if (!filePath) return;

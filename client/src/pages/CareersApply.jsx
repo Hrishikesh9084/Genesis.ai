@@ -1,8 +1,97 @@
 import { useEffect, useMemo, useState } from "react";
-import { useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
 import api from "../services/api";
+
+const RECAPTCHA_ACTION = "careers_apply";
+const RECAPTCHA_SCRIPT_ID = "google-recaptcha-v3-script";
+
+function getRecaptchaWindow() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window;
+}
+
+function loadRecaptchaV3(siteKey) {
+  const browserWindow = getRecaptchaWindow();
+
+  if (!browserWindow) {
+    return Promise.reject(new Error("Google reCAPTCHA is only available in the browser."));
+  }
+
+  if (browserWindow.grecaptcha?.execute) {
+    return Promise.resolve(browserWindow.grecaptcha);
+  }
+
+  if (browserWindow.__recaptchaV3Promise) {
+    return browserWindow.__recaptchaV3Promise;
+  }
+
+  browserWindow.__recaptchaV3Promise = new Promise((resolve, reject) => {
+    const existingScript = document.getElementById(RECAPTCHA_SCRIPT_ID);
+
+    const handleReady = () => {
+      if (browserWindow.grecaptcha?.ready) {
+        browserWindow.grecaptcha.ready(() => resolve(browserWindow.grecaptcha));
+        return;
+      }
+
+      reject(new Error("Google reCAPTCHA failed to initialize."));
+    };
+
+    if (existingScript) {
+      if (browserWindow.grecaptcha?.ready) {
+        handleReady();
+        return;
+      }
+
+      existingScript.addEventListener("load", handleReady, { once: true });
+      existingScript.addEventListener(
+        "error",
+        () => reject(new Error("Google reCAPTCHA failed to load.")),
+        { once: true }
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = RECAPTCHA_SCRIPT_ID;
+    script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(siteKey)}`;
+    script.async = true;
+    script.defer = true;
+    script.onload = handleReady;
+    script.onerror = () => reject(new Error("Google reCAPTCHA failed to load."));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    browserWindow.__recaptchaV3Promise = null;
+    throw error;
+  });
+
+  return browserWindow.__recaptchaV3Promise;
+}
+
+async function executeRecaptchaV3(siteKey, action) {
+  const browserWindow = getRecaptchaWindow();
+  if (!browserWindow) {
+    throw new Error("Google reCAPTCHA is only available in the browser.");
+  }
+
+  const grecaptcha = await loadRecaptchaV3(siteKey);
+
+  return new Promise((resolve, reject) => {
+    try {
+      grecaptcha.ready(() => {
+        grecaptcha
+          .execute(siteKey, { action })
+          .then(resolve)
+          .catch(reject);
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
 
 export default function CareersApply() {
   const [searchParams] = useSearchParams();
@@ -16,9 +105,9 @@ export default function CareersApply() {
   const [submittedApplicationId, setSubmittedApplicationId] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [resumeFile, setResumeFile] = useState(null);
-  const [hcaptchaToken, setHcaptchaToken] = useState("");
-  const hcaptchaRef = useRef(null);
-  const hcaptchaSiteKey = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "";
+  const recaptchaSiteKey = String(import.meta.env.VITE_RECAPTCHA_SITE_KEY || "").trim();
+  const [recaptchaReady, setRecaptchaReady] = useState(false);
+  const [recaptchaError, setRecaptchaError] = useState("");
   const [formValues, setFormValues] = useState({
     roleId: "",
     fullName: "",
@@ -62,6 +151,34 @@ export default function CareersApply() {
     };
   }, [roleFromQuery]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    if (!recaptchaSiteKey) {
+      setRecaptchaReady(false);
+      setRecaptchaError("");
+      return undefined;
+    }
+
+    loadRecaptchaV3(recaptchaSiteKey)
+      .then(() => {
+        if (mounted) {
+          setRecaptchaReady(true);
+          setRecaptchaError("");
+        }
+      })
+      .catch((error) => {
+        if (mounted) {
+          setRecaptchaReady(false);
+          setRecaptchaError(error?.message || "Google reCAPTCHA failed to load.");
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [recaptchaSiteKey]);
+
   const selectedRole = useMemo(
     () => jobs.find((job) => job.id === formValues.roleId),
     [jobs, formValues.roleId]
@@ -89,8 +206,8 @@ export default function CareersApply() {
       return;
     }
 
-    if (!hcaptchaToken) {
-      setErrorMessage("Please complete the hCaptcha challenge.");
+    if (!recaptchaSiteKey) {
+      setErrorMessage("Google reCAPTCHA site key is not configured. Set VITE_RECAPTCHA_SITE_KEY to a Google reCAPTCHA v3 site key.");
       return;
     }
 
@@ -98,12 +215,14 @@ export default function CareersApply() {
     setErrorMessage("");
 
     try {
+      const recaptchaToken = await executeRecaptchaV3(recaptchaSiteKey, RECAPTCHA_ACTION);
+
       const payload = new FormData();
       Object.entries(formValues).forEach(([key, value]) => {
         payload.append(key, value ?? "");
       });
       payload.append("resume", resumeFile);
-      payload.append("hcaptchaToken", hcaptchaToken);
+      payload.append("recaptchaToken", recaptchaToken);
 
       const response = await api.post("/careers/apply", payload, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -125,10 +244,6 @@ export default function CareersApply() {
         coverLetter: "",
       }));
       setResumeFile(null);
-      setHcaptchaToken("");
-      if (hcaptchaRef.current) {
-        hcaptchaRef.current.resetCaptcha();
-      }
     } catch (error) {
       setSubmitted(false);
       setSubmittedApplicationId("");
@@ -222,7 +337,7 @@ export default function CareersApply() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-sm text-slate-300">Phone</label>
-              <input className="input-field" name="phone" value={formValues.phone} onChange={handleChange} placeholder="Optional" />
+              <input className="input-field" name="phone" value={formValues.phone} onChange={handleChange} placeholder="Phone Number" required />
             </div>
             <div>
               <label className="mb-1.5 block text-sm text-slate-300">Current location</label>
@@ -283,34 +398,34 @@ export default function CareersApply() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm text-slate-300">Spam protection</label>
-            {hcaptchaSiteKey ? (
-              <HCaptcha
-                ref={hcaptchaRef}
-                sitekey={hcaptchaSiteKey}
-                onVerify={(token) => setHcaptchaToken(token)}
-                onExpire={() => setHcaptchaToken("")}
-                onError={() => setHcaptchaToken("")}
-              />
-            ) : (
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-                hCaptcha site key is not configured. Set VITE_HCAPTCHA_SITE_KEY in client environment.
-              </div>
-            )}
-          </div>
-
-          <div>
             <label className="mb-1.5 block text-sm text-slate-300">Cover letter</label>
             <textarea
               className="input-field min-h-36 resize-y"
               name="coverLetter"
               value={formValues.coverLetter}
               onChange={handleChange}
-              minLength={50}
               maxLength={5000}
-              placeholder="Tell us why you are a fit for this role."
+              placeholder="Tell us why you are a fit for this role. "
             />
-            <p className="mt-1 text-xs text-slate-500">Minimum 50 characters.</p>
+            <p className="mt-1 text-xs text-slate-500"> Add one if you want to share extra context.</p>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm text-slate-300">Spam protection</label>
+
+            {recaptchaSiteKey ? (
+              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
+                {recaptchaError
+                  ? recaptchaError
+                  : recaptchaReady
+                    ? "Google reCAPTCHA v3 is ready and will run automatically when you submit the form."
+                    : "Loading Google reCAPTCHA v3..."}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                Google reCAPTCHA site key is not configured. Set VITE_RECAPTCHA_SITE_KEY to a Google reCAPTCHA v3 site key.
+              </div>
+            )}
           </div>
 
           <button type="submit" className="btn-primary w-full rounded-xl" disabled={isSubmitting || jobsLoading || jobs.length === 0}>

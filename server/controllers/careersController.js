@@ -204,18 +204,21 @@ function getAllowedStatuses() {
   return ['new', 'reviewing', 'shortlisted', 'rejected', 'hired', 'archived'];
 }
 
-async function verifyHCaptchaToken({ token, remoteIp }) {
-  const secret = String(process.env.HCAPTCHA_SECRET || '').trim();
+async function verifyRecaptchaToken({ token, remoteIp }) {
+  const secret = String(process.env.RECAPTCHA_SECRET || process.env.HCAPTCHA_SECRET || '').trim();
+  const expectedAction = String(process.env.RECAPTCHA_V3_ACTION || 'careers_apply').trim();
+  const minimumScoreRaw = String(process.env.RECAPTCHA_V3_MIN_SCORE || '0.5').trim();
+  const minimumScore = Number.parseFloat(minimumScoreRaw);
 
   if (!secret) {
     return {
       success: String(process.env.NODE_ENV || '').toLowerCase() !== 'production',
-      reason: 'hCaptcha secret not configured',
+      reason: 'reCAPTCHA secret not configured',
     };
   }
 
   if (!String(token || '').trim()) {
-    return { success: false, reason: 'hCaptcha token is missing' };
+    return { success: false, reason: 'reCAPTCHA token is missing' };
   }
 
   const body = new URLSearchParams({
@@ -227,20 +230,38 @@ async function verifyHCaptchaToken({ token, remoteIp }) {
     body.set('remoteip', String(remoteIp));
   }
 
-  const response = await fetch('https://hcaptcha.com/siteverify', {
+  const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   });
 
   if (!response.ok) {
-    return { success: false, reason: 'hCaptcha verification request failed' };
+    return { success: false, reason: 'reCAPTCHA verification request failed' };
   }
 
   const result = await response.json();
+  const score = typeof result?.score === 'number' ? result.score : null;
+  const action = String(result?.action || '').trim();
+
+  let success = Boolean(result?.success);
+  let reason = Array.isArray(result?.['error-codes']) ? result['error-codes'].join(', ') : '';
+
+  if (success && expectedAction && action && action !== expectedAction) {
+    success = false;
+    reason = reason ? `${reason}; unexpected action: ${action}` : `unexpected action: ${action}`;
+  }
+
+  if (success && Number.isFinite(minimumScore) && score !== null && score < minimumScore) {
+    success = false;
+    reason = reason ? `${reason}; score ${score} below minimum ${minimumScore}` : `score ${score} below minimum ${minimumScore}`;
+  }
+
   return {
-    success: Boolean(result?.success),
-    reason: Array.isArray(result?.['error-codes']) ? result['error-codes'].join(', ') : '',
+    success,
+    reason,
+    score,
+    action,
   };
 }
 
@@ -261,8 +282,8 @@ const getJobs = async (_req, res, next) => {
 
 const applyForJob = async (req, res, next) => {
   try {
-    const captchaCheck = await verifyHCaptchaToken({
-      token: req.body?.hcaptchaToken,
+    const captchaCheck = await verifyRecaptchaToken({
+      token: req.body?.recaptchaToken || req.body?.hcaptchaToken,
       remoteIp: req.ip,
     });
 
@@ -274,7 +295,8 @@ const applyForJob = async (req, res, next) => {
           // Ignore cleanup failure in captcha reject path.
         }
       }
-      return res.status(400).json({ error: 'hCaptcha verification failed. Please try again.' });
+      const captchaError = captchaCheck.reason ? `reCAPTCHA verification failed: ${captchaCheck.reason}` : 'reCAPTCHA verification failed. Please try again.';
+      return res.status(400).json({ error: captchaError });
     }
 
     const roleId = String(req.body?.roleId || '').trim();
@@ -377,8 +399,8 @@ const applyForJob = async (req, res, next) => {
       const safeResume = escapeHtml(resumeOriginalName || 'Uploaded (secure storage)');
       const safeCoverLetter = escapeHtml(coverLetter).replaceAll('\n', '<br/>');
 
-      try {
-        if (inbox) {
+      if (inbox) {
+        try {
           await emailService.sendMail({
             to: inbox,
             subject: `New Job Application - ${roleTitle}`,
@@ -414,8 +436,12 @@ const applyForJob = async (req, res, next) => {
               </div>
             `,
           });
+        } catch (mailErr) {
+          console.error('Careers admin notification failed:', mailErr.message);
         }
+      }
 
+      try {
         await emailService.sendMail({
           to: email,
           subject: 'Application received - Genesis.ai Careers',
@@ -441,7 +467,7 @@ const applyForJob = async (req, res, next) => {
           `,
         });
       } catch (mailErr) {
-        console.error('Careers email delivery failed:', mailErr.message);
+        console.error('Careers confirmation email failed:', mailErr.message);
       }
     }
 

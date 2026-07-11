@@ -5,14 +5,14 @@ import api from "../services/api";
 const contactCards = [
   {
     title: "Email",
-    value: "hello@genesis.ai@gmail.com",
+    value: "hello@genesis.com",
     helper: "We reply within 1 business day.",
     icon: Mail,
   },
   {
     title: "Phone",
     value: "+91 9503908995",
-    helper: "Mon-Fri, 9:00 AM to 6:00 PM",
+    helper: "Mon-Sun, 9:00 AM to 6:00 PM",
     icon: Phone,
   },
   {
@@ -32,6 +32,9 @@ export default function Contact() {
     email: "",
     subject: "",
     message: "",
+    callbackRequested: false,
+    phone: "",
+    preferredCallbackTime: "",
   });
 
   const handleChange = (event) => {
@@ -50,7 +53,15 @@ export default function Contact() {
     try {
       await api.post("/contact", formValues);
       setSubmitted(true);
-      setFormValues({ name: "", email: "", subject: "", message: "" });
+      setFormValues({
+        name: "",
+        email: "",
+        subject: "",
+        message: "",
+        callbackRequested: false,
+        phone: "",
+        preferredCallbackTime: "",
+      });
     } catch (error) {
       setSubmitted(false);
       setErrorMessage(error.response?.data?.error || "Failed to send message. Please try again.");
@@ -118,6 +129,26 @@ export default function Contact() {
             )}
 
             <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+              <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
+                <input
+                  type="checkbox"
+                  name="callbackRequested"
+                  checked={formValues.callbackRequested}
+                  onChange={(event) =>
+                    setFormValues((prev) => ({
+                      ...prev,
+                      callbackRequested: event.target.checked,
+                    }))
+                  }
+                  className="mt-1 h-4 w-4 rounded border-white/20 bg-transparent text-orange-500 focus:ring-orange-500"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-white">Request a callback</span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-400">
+                    Add your phone number and preferred time so admin can reach you directly.
+                  </span>
+                </span>
+              </label>
               <div>
                 <label className="mb-1.5 block text-sm text-slate-300">Name</label>
                 <input
@@ -167,8 +198,39 @@ export default function Contact() {
                   required
                 />
               </div>
+              {formValues.callbackRequested && (
+                <>
+                  <div>
+                    <label className="mb-1.5 block text-sm text-slate-300">Phone number</label>
+                    <input
+                      className="input-field"
+                      type="tel"
+                      name="phone"
+                      placeholder="Enter the best number to reach you"
+                      value={formValues.phone}
+                      onChange={handleChange}
+                      maxLength={40}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm text-slate-300">
+                      Preferred callback time
+                    </label>
+                    <input
+                      className="input-field"
+                      type="text"
+                      name="preferredCallbackTime"
+                      placeholder="For example: Today after 6 PM or tomorrow morning"
+                      value={formValues.preferredCallbackTime}
+                      onChange={handleChange}
+                      maxLength={120}
+                    />
+                  </div>
+                </>
+              )}
               <button type="submit" className="btn-primary w-full rounded-xl" disabled={isSubmitting}>
-                {isSubmitting ? "Sending..." : "Send Message"}
+                {isSubmitting ? "Sending..." : formValues.callbackRequested ? "Request Callback" : "Send Message"}
               </button>
             </form>
           </div>

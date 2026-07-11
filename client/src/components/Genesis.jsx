@@ -10,9 +10,9 @@ const Genesis = () => {
         animate={{ y: 0, opacity: 1 }}
         viewport={{ once: true }}
       >
-        <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-3xl h-full max-h-24 hover:bg-slate-100 rounded-full blur-[100px] pointer-events-none" />
-        <h1 className="text-4xl text-[clamp(1rem,22vw,21rem)] text-center font-extrabold leading-[0.7] text-transparent md:text-[clamp(2rem,24vw,21rem)] [-webkit-text-stroke:5px_#D4D4D4] mt-44">
-          Genesis
+        <div className="absolute inset-x-0 bottom-0 mx-auto h-full max-h-32 w-full max-w-4xl rounded-full bg-orange-500/10 blur-[110px] pointer-events-none" />
+        <h1 className="font-display mt-40 text-center text-[clamp(3rem,22vw,16rem)] font-semibold leading-[0.8] tracking-tight text-transparent md:text-[clamp(5rem,23vw,18rem)] [-webkit-text-stroke:1px_rgba(255,255,255,0.35)]">
+          Genesis 3.0
         </h1>
       </motion.div>
     </div>

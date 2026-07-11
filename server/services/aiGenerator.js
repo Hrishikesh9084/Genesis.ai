@@ -1434,8 +1434,8 @@ function buildModelFallbackSequence(preferredModelId) {
   // Add other fast models from different providers
   addModel('gpt-4o-mini');
   addModel('gemini-2.5-flash');
-  addModel('claude-3-5-haiku-latest');
   addModel('mistral-small-latest');
+  addModel('claude-3-5-haiku-latest');
   addModel('grok-3-mini');
 
   // Add DEFAULT_MODEL if not already included

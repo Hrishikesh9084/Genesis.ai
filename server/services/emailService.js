@@ -4,8 +4,12 @@ function getAuthMethod() {
   return String(process.env.SMTP_AUTH_METHOD || 'password').toLowerCase();
 }
 
+function getOAuthClientId() {
+  return String(process.env.GOOGLE_CLIENT_ID || process.env.SMTP_CLIENT_ID || '').trim();
+}
+
 function getOAuthClientSecret() {
-  return process.env.SMTP_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || '';
+  return String(process.env.SMTP_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || '').trim();
 }
 
 function isEmailConfigured() {
@@ -14,7 +18,7 @@ function isEmailConfigured() {
   if (authMethod === 'oauth2') {
     return Boolean(
       process.env.SMTP_USER &&
-        process.env.SMTP_CLIENT_ID &&
+        getOAuthClientId() &&
         getOAuthClientSecret() &&
         process.env.SMTP_REFRESH_TOKEN &&
         process.env.SMTP_FROM
@@ -39,7 +43,7 @@ function createTransporter() {
       auth: {
         type: 'OAuth2',
         user: process.env.SMTP_USER,
-        clientId: process.env.SMTP_CLIENT_ID,
+        clientId: getOAuthClientId(),
         clientSecret: getOAuthClientSecret(),
         refreshToken: process.env.SMTP_REFRESH_TOKEN,
       },
@@ -57,27 +61,88 @@ function createTransporter() {
   });
 }
 
-async function sendMail({ to, subject, text, html }) {
-  if (!isEmailConfigured()) {
-    return { skipped: true, reason: 'SMTP configuration is missing.' };
+function isOauthGrantError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.code === 'EAUTH' || message.includes('invalid_grant') || message.includes('invalid grant');
+}
+
+function hasPasswordSmtpConfig() {
+  return Boolean(
+    process.env.SMTP_HOST &&
+      process.env.SMTP_PORT &&
+      process.env.SMTP_USER &&
+      process.env.SMTP_PASS &&
+      process.env.SMTP_FROM
+  );
+}
+
+async function sendWithPasswordFallback(payload) {
+  if (!hasPasswordSmtpConfig()) {
+    return null;
   }
 
-  const transporter = createTransporter();
-  const info = await transporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to,
-    subject,
-    text,
-    html,
+  const passwordTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
   });
 
+  const info = await passwordTransporter.sendMail(payload);
   return {
     skipped: false,
     accepted: info.accepted || [],
     rejected: info.rejected || [],
     response: info.response,
     messageId: info.messageId,
+    fallbackUsed: true,
   };
+}
+
+async function sendMail({ to, subject, text, html }) {
+  if (!isEmailConfigured()) {
+    return { skipped: true, reason: 'SMTP configuration is missing.' };
+  }
+
+  const payload = {
+    from: process.env.SMTP_FROM,
+    to,
+    subject,
+    text,
+    html,
+  };
+
+  try {
+    const transporter = createTransporter();
+    const info = await transporter.sendMail(payload);
+
+    return {
+      skipped: false,
+      accepted: info.accepted || [],
+      rejected: info.rejected || [],
+      response: info.response,
+      messageId: info.messageId,
+    };
+  } catch (error) {
+    if (getAuthMethod() === 'oauth2' && isOauthGrantError(error)) {
+      const fallbackResult = await sendWithPasswordFallback(payload);
+      if (fallbackResult) {
+        return fallbackResult;
+      }
+
+      const wrappedError = new Error(
+        'Email delivery failed: Gmail OAuth refresh token is invalid or expired. Regenerate SMTP_REFRESH_TOKEN, or switch SMTP_AUTH_METHOD to password and configure SMTP_PASS.'
+      );
+      wrappedError.cause = error;
+      wrappedError.code = 'EMAIL_OAUTH_INVALID_GRANT';
+      throw wrappedError;
+    }
+
+    throw error;
+  }
 }
 
 async function sendWelcomeEmail({ to, name }) {

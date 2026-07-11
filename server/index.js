@@ -10,6 +10,7 @@ import db from './config/db.js';
 import authRoutes from './routes/auth.js';
 import projectRoutes from './routes/projects.js';
 import deployRoutes from './routes/deploy.js';
+import ctoRoutes from './routes/cto.js';
 import domainsRoutes from './routes/domains.js';
 import paymentRoutes from './routes/payments.js';
 import contactRoutes from './routes/contact.js';
@@ -124,6 +125,7 @@ app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars
 
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/cto', ctoRoutes);
 app.use('/api/deploy', deployRoutes);
 app.use('/deploy', deployRoutes);
 app.use('/api/domains', domainsRoutes);
