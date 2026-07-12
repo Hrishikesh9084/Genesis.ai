@@ -178,8 +178,6 @@ Common categories include:
 
 ## Developer Info
 
-![Hrishikesh Chaudhari](./client/public/assets/IMG_20250929_140502_465.jpg)
-
 **Hrishikesh Chaudhari**  
 Nashik, Maharashtra, India
 
